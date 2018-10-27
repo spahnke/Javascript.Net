@@ -23,7 +23,6 @@ namespace Noesis
 
             void InspectorClient::runMessageLoopOnPause(int context_group_id)
             {
-                System::Diagnostics::Debug::WriteLine("runMessageLoopOnPause");
                 if (this->running_nested_loop) {
                     return;
                 }
@@ -45,7 +44,6 @@ namespace Noesis
 
             void InspectorClient::ContextCreated(v8::Local<v8::Context> context, System::String^ name)
             {
-                System::Diagnostics::Debug::WriteLine("ContextCreated");
                 v8_inspector::StringView view = StringViewConversion::ConvertToStringView(name);
                 v8_inspector::V8ContextInfo info(context, CONTEXT_GROUP_ID, view);
                 this->client->contextCreated(info);
@@ -53,26 +51,22 @@ namespace Noesis
 
             void InspectorClient::ContextDestroyed(v8::Local<v8::Context> context)
             {
-                System::Diagnostics::Debug::WriteLine("ContextDestroyed");
                 this->client->contextDestroyed(context);
             }
 
             void InspectorClient::ConnectFrontend(BackChannelDelegate^ backChannelDelegate)
             {
-                System::Diagnostics::Debug::WriteLine("ConnectFrontend");
                 this->channel = std::make_unique<MessageChannel>(this->client.get(), this->CONTEXT_GROUP_ID, backChannelDelegate);
             }
 
             void InspectorClient::DisconnectFrontend()
             {
-                System::Diagnostics::Debug::WriteLine("DisconnectFrontend");
                 quitMessageLoopOnPause();
             }
 
             void InterruptCallback(v8::Isolate *isolate, void *obj)
             {
-                System::Diagnostics::Debug::WriteLine("InterruptCallback");
-                // Do nothing just interrupt the current thread
+                // do nothing just interrupt the current thread
             }
 
             void InspectorClient::DispatchMessage(System::String^ message)
@@ -90,19 +84,16 @@ namespace Noesis
 
             void InspectorClient::SchedulePauseOnNextStatement(System::String^ reason)
             {
-                System::Diagnostics::Debug::WriteLine("SchedulePauseOnNextStatement");
                 this->channel->SchedulePauseOnNextStatement(reason);
             }
 
             void InspectorClient::quitMessageLoopOnPause()
             {
-                System::Diagnostics::Debug::WriteLine("quitMessageLoopOnPause");
                 terminated = true;
             }
 
             v8::Local<v8::Context> InspectorClient::ensureDefaultContextInGroup(int contextGroupId)
             {
-                System::Diagnostics::Debug::WriteLine("ensureDefaultContextInGroup");
                 return this->isolate.GetCurrentContext();
             }
         }

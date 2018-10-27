@@ -117,7 +117,6 @@ namespace Noesis
                 }
                 if (this->debuggerState != DebuggerState::Started)
                 {
-                    System::Diagnostics::Debug::WriteLine(this->debuggerState);
                     throw gcnew System::InvalidOperationException("WrongDebuggerState");
                 }
 

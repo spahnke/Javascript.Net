@@ -15,7 +15,6 @@ namespace Noesis
 
             void DispatchMessageTask::Run()
             {
-                System::Diagnostics::Debug::WriteLine("DispatchMessageTask");
                 this->channel.DispatchProtocolMessage(this->message);
             }
         }

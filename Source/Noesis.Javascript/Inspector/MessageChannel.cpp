@@ -16,7 +16,9 @@ namespace Noesis
             
             void MessageChannel::DispatchProtocolMessage(System::String^ message)
             {
+#ifdef DEBUG
                 System::Diagnostics::Debug::WriteLine(System::String::Format("Request: {0}", message));
+#endif
                 v8_inspector::StringView view = StringViewConversion::ConvertToStringView(message);
                 this->session->dispatchProtocolMessage(view);
             }
@@ -36,14 +38,18 @@ namespace Noesis
             void MessageChannel::sendResponse(int callId, std::unique_ptr<v8_inspector::StringBuffer> messageBuffer)
             {
                 System::String^ message = StringViewConversion::ConvertToString(messageBuffer->string());
+#ifdef DEBUG
                 System::Diagnostics::Debug::WriteLine(System::String::Format("Response: {0}", message));
+#endif
                 this->backChannelDelegate->SendResponse(message);
             }
 
             void MessageChannel::sendNotification(std::unique_ptr<v8_inspector::StringBuffer> messageBuffer)
             {
                 System::String^ message = StringViewConversion::ConvertToString(messageBuffer->string());
+#ifdef DEBUG
                 System::Diagnostics::Debug::WriteLine(System::String::Format("Notification: {0}", message));
+#endif
                 this->backChannelDelegate->SendNotification(message);
             }
 
