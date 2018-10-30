@@ -1541,5 +1541,41 @@ function activeWait(seconds)
             // test it
             Assert.AreEqual(1, (int)pauseNotification.MessageObj.@params.callFrames[0].location.lineNumber);
         }
+
+        [TestMethod]
+        [TestCategory("Specified")]
+        [Description("Stops the debugger - there is no message")]
+        public void Debugger_Stop_StopsExecution()
+        {
+            Message pauseNotification = null;
+            SemaphoreSlim bpPauseNotificationLock = new SemaphoreSlim(0);
+
+            context.SetParameter("foo", "42");
+            var scriptExecution = StartDebugHelper("foo = 73;\nfoo = 99;", (m) => {
+                if (m.MessageObj.method.ToString() == "Debugger.paused")
+                {
+                    pauseNotification = m;
+                    bpPauseNotificationLock.Release();
+                }
+            });
+
+            // set bp on second line
+            SendDebuggerSetBreakpointMessage(scriptExecution.ScriptId, 1);
+            
+            // resume debugger to hit debugger stm
+            SendDebuggerResumeMessage();
+
+            // wait
+            bpPauseNotificationLock.Wait();
+
+            // stop debugging
+            debugContext.Cancel();
+
+            // wait for debug task
+            scriptExecution.ScriptTask.Wait();
+
+            // test it
+            Assert.AreEqual(73, context.GetParameter("foo"));
+        }
     }
 }

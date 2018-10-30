@@ -6,6 +6,7 @@
 #include "StringViewConversion.h"
 #include "MessageChannel.h"
 #include "v8-inspector.h"
+#include "..\JavascriptInterop.h"
 
 namespace Noesis
 {
@@ -35,6 +36,11 @@ namespace Noesis
                 }
                 this->terminated = false;
                 this->running_nested_loop = false;
+            }
+
+            void InspectorClient::Cancel() {
+                this->isolate.TerminateExecution();
+                this->quitMessageLoopOnPause();
             }
 
             MessageChannel& InspectorClient::GetChannel()

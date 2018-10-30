@@ -30,6 +30,8 @@ namespace Noesis
                 System::Object^ Debug(System::String^ script, System::Action<System::String^>^ OnNotificationHandler);
                 System::Object^ Debug(System::String^ script, System::String^ scriptResourceName, System::Action<System::String^>^ OnNotificationHandler);
 
+                void Cancel();
+
                 // Sends additional messages during the debugging session to interact directly with the debugger
                 System::String^ SendProtocolMessage(System::String^ message);
                 

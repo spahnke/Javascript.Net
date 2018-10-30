@@ -90,6 +90,15 @@ namespace Noesis
 
                     return result;
                 }
+                catch (JavascriptException^ exception) {
+                    if (exception->Message != L"Execution Terminated") {
+                        /*mLine = -1;
+                        mStartColumn = -1;
+                        mEndColumn = -1;*/
+
+                        throw exception;
+                    }
+                }
                 finally
                 {
                     // try release debugger state
@@ -104,6 +113,10 @@ namespace Noesis
                 // release debugger state
                 this->debuggerState = DebuggerState::Stopped;
                 }
+            }
+
+            void DebugContext::Cancel() {
+                this->inspectorClient->Cancel();
             }
 
             /*
