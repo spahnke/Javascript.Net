@@ -38,7 +38,7 @@ namespace Noesis
                 this->running_nested_loop = false;
             }
 
-            void InspectorClient::Cancel() {
+            void InspectorClient::TerminateExecution() {
                 this->isolate.TerminateExecution();
                 this->quitMessageLoopOnPause();
             }

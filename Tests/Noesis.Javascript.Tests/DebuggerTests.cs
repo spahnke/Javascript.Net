@@ -54,6 +54,8 @@ namespace Noesis.Javascript.Tests
             public Message DebuggerPausedNotificationAfterStart { get; set; }
 
             public object ResultAfterFinished { get; set; }
+
+            public JavascriptException Exception { get; set; }
         }
 
         private DebuggerTask StartDebugHelper(string code, Action<Message> OnNotificationHandler)
@@ -63,33 +65,40 @@ namespace Noesis.Javascript.Tests
             var debuggerSession = new DebuggerTask();
             debuggerSession.ScriptTask = Task.Run(() =>
             {
-                debuggerSession.ResultAfterFinished = debugContext.Debug(code, (s) =>
+                try
                 {
-                    var m = new Message(s);
-                    if (useOnlyExternalHandler)
+                    debuggerSession.ResultAfterFinished = debugContext.Debug(code, (s) =>
                     {
-                        OnNotificationHandler(m);
-                    }
-                    else
-                    {
-                        switch (m.MessageObj.method.ToString())
+                        var m = new Message(s);
+                        if (useOnlyExternalHandler)
                         {
-                            case "Debugger.scriptParsed":
-                                debuggerSession.ScriptStatusNotification = m;
-                                debuggerSession.ScriptId = m.MessageObj.@params.scriptId.ToString();
-                                break;
-                            case "Debugger.scriptFailedToParse":
-                                debuggerSession.ScriptStatusNotification = m;
-                                debuggerReady.Release();
-                                break;
-                            case "Debugger.paused":
-                                debuggerSession.DebuggerPausedNotificationAfterStart = m;
-                                debuggerReady.Release();
-                                useOnlyExternalHandler = true;
-                                break;
+                            OnNotificationHandler(m);
                         }
-                    }
-                });
+                        else
+                        {
+                            switch (m.MessageObj.method.ToString())
+                            {
+                                case "Debugger.scriptParsed":
+                                    debuggerSession.ScriptStatusNotification = m;
+                                    debuggerSession.ScriptId = m.MessageObj.@params.scriptId.ToString();
+                                    break;
+                                case "Debugger.scriptFailedToParse":
+                                    debuggerSession.ScriptStatusNotification = m;
+                                    debuggerReady.Release();
+                                    break;
+                                case "Debugger.paused":
+                                    debuggerSession.DebuggerPausedNotificationAfterStart = m;
+                                    debuggerReady.Release();
+                                    useOnlyExternalHandler = true;
+                                    break;
+                            }
+                        }
+                    });
+                }
+                catch (JavascriptException e)
+                {
+                    debuggerSession.Exception = e;
+                }
             });
             debuggerReady.Wait();
             return debuggerSession;
@@ -1569,13 +1578,14 @@ function activeWait(seconds)
             bpPauseNotificationLock.Wait();
 
             // stop debugging
-            debugContext.Cancel();
+            debugContext.TerminateExecution();
 
             // wait for debug task
             scriptExecution.ScriptTask.Wait();
 
             // test it
             Assert.AreEqual(73, context.GetParameter("foo"));
+            Assert.AreEqual("Execution Terminated", scriptExecution.Exception.Message);
         }
     }
 }

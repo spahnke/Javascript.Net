@@ -30,7 +30,7 @@ namespace Noesis
                 v8::Local<v8::Context> ensureDefaultContextInGroup(int contextGroupId) override;
                 
                 MessageChannel& GetChannel();
-                void Cancel();
+                void TerminateExecution();
 
                 const int CONTEXT_GROUP_ID = 1;
 
