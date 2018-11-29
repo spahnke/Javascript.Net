@@ -15,6 +15,31 @@ namespace Noesis.Javascript.Tests
         {
             public Decimal decimalValue { get; set; }
             public float? nullableFloat { get; set; }
+
+            public int methodWithoutParameters()
+            {
+                return 1;
+            }
+
+            public int methodWithOneParameter(int i)
+            {
+                return i + 1;
+            }
+
+            public string methodWithMultipleMixedParameters(int i, string s, bool b)
+            {
+                return String.Format("i: {0}, s: {1}, b: {2}", i, s, b);
+            }
+
+            public string methodWithDefaultParameter(string s = "")
+            {
+                return s;
+            }
+
+            public string methodWithRequiredAndDefaultParameters(int i, string s = "abc", bool b = true)
+            {
+                return String.Format("i: {0}, s: {1}, b: {2}", i, s, b);
+            }
         }
 
         [TestInitialize]
@@ -164,6 +189,116 @@ namespace Noesis.Javascript.Tests
         public void SelfReferentialArrayDoesNotCauseStackOverflow()
         {
             _context.Run("a = []; a.push(a)");
+        }
+
+        [TestMethod]
+        public void MethodCallWithoutParameters()
+        {
+            var obj = new TypedPropertiesClass();
+            _context.SetParameter("obj", obj);
+            var result = _context.Run("obj.methodWithoutParameters()");
+
+            result.Should().Be(1);
+        }
+
+        [TestMethod]
+        public void MethodCallWithoutParameters_RedundantArgumentsAreIgnored()
+        {
+            var obj = new TypedPropertiesClass();
+            _context.SetParameter("obj", obj);
+            var result = _context.Run("obj.methodWithoutParameters(42)");
+
+            result.Should().Be(1);
+        }
+
+        [TestMethod]
+        public void MethodCallWithParameter()
+        {
+            var obj = new TypedPropertiesClass();
+            _context.SetParameter("obj", obj);
+            var result = _context.Run("obj.methodWithOneParameter(1)");
+
+            result.Should().Be(2);
+        }
+
+        [TestMethod]
+        public void MethodCallWithMixedParameter()
+        {
+            var obj = new TypedPropertiesClass();
+            _context.SetParameter("obj", obj);
+            var result = _context.Run("obj.methodWithMultipleMixedParameters(1, 'test', false)");
+
+            result.Should().Be("i: 1, s: test, b: False");
+        }
+
+        [TestMethod]
+        public void MethodCallWithDefaultParameter_PassingNoActualParameter()
+        {
+            var obj = new TypedPropertiesClass();
+            _context.SetParameter("obj", obj);
+            var result = _context.Run("obj.methodWithDefaultParameter()");
+
+            result.Should().Be("");
+        }
+
+        [TestMethod]
+        public void MethodCallWithDefaultParameter_PassingActualParameter()
+        {
+            var obj = new TypedPropertiesClass();
+            _context.SetParameter("obj", obj);
+            var result = _context.Run("obj.methodWithDefaultParameter('foo')");
+
+            result.Should().Be("foo");
+        }
+
+        [TestMethod]
+        public void MethodCallWithDefaultParameter_PassingExcplicitNullAsActualParameter()
+        {
+            var obj = new TypedPropertiesClass();
+            _context.SetParameter("obj", obj);
+            var result = _context.Run("obj.methodWithDefaultParameter(null)");
+
+            result.Should().Be(null);
+        }
+
+        [TestMethod]
+        public void MethodCallWithRequiredAndDefaultParameters_PassingNoOptionalActualParameter()
+        {
+            var obj = new TypedPropertiesClass();
+            _context.SetParameter("obj", obj);
+            var result = _context.Run("obj.methodWithRequiredAndDefaultParameters(1)");
+
+            result.Should().Be("i: 1, s: abc, b: True");
+        }
+
+        [TestMethod]
+        public void MethodCallWithRequiredAndDefaultParameters_PassingAllActualParameter()
+        {
+            var obj = new TypedPropertiesClass();
+            _context.SetParameter("obj", obj);
+            var result = _context.Run("obj.methodWithRequiredAndDefaultParameters(1, 'test', false)");
+
+            result.Should().Be("i: 1, s: test, b: False");
+        }
+
+        [TestMethod]
+        public void MethodCallWithRequiredAndDefaultParameters_PassingUndefinedForAllOptionalActualParameter()
+        {
+            var obj = new TypedPropertiesClass();
+            _context.SetParameter("obj", obj);
+            var result = _context.Run("obj.methodWithRequiredAndDefaultParameters(1, undefined, undefined)");
+
+            result.Should().Be("i: 1, s: abc, b: True");
+        }
+
+        [TestMethod]
+        public void MethodCallWithRequiredAndDefaultParameters_PassingOnlyOneOptionalActualParameterLeavingTheMiddleOneUndefined()
+        {
+            var obj = new TypedPropertiesClass();
+            _context.SetParameter("obj", obj);
+            var result = _context.Run("obj.methodWithRequiredAndDefaultParameters(1, undefined, false)");
+
+            result.Should().Be("i: 1, s: abc, b: False");
         }
     }
 }

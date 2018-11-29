@@ -667,6 +667,17 @@ JavascriptInterop::IndexSetter(uint32_t iIndex, Local<Value> iValue, const Prope
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+int CountMaximumNumberOfParameters(cli::array<System::Reflection::MemberInfo^>^ members)
+{
+    int maxParameters = 0;
+    for (int i = 0; i < members->Length; i++)
+    {
+        System::Reflection::MethodInfo^ method = (System::Reflection::MethodInfo^) members[i];
+        maxParameters = System::Math::Max(maxParameters, method->GetParameters()->Length);
+    }
+    return maxParameters;
+}
+
 void
 JavascriptInterop::Invoker(const v8::FunctionCallbackInfo<Value>& iArgs)
 {
@@ -692,10 +703,12 @@ JavascriptInterop::Invoker(const v8::FunctionCallbackInfo<Value>& iArgs)
 
 	if (members->Length > 0 && members[0]->MemberType == System::Reflection::MemberTypes::Method)
 	{
+        int maxParameters = CountMaximumNumberOfParameters(members);
+
 		// parameters
-		suppliedArguments = gcnew cli::array<System::Object^>(iArgs.Length());
+		suppliedArguments = gcnew cli::array<System::Object^>(maxParameters);
 		ConvertedObjects already_converted;
-		for (int i = 0; i < iArgs.Length(); i++)
+		for (int i = 0; i < maxParameters; i++)
 			suppliedArguments[i] = ConvertFromV8(iArgs[i], already_converted);
 		
 		// look for best matching method
@@ -710,7 +723,7 @@ JavascriptInterop::Invoker(const v8::FunctionCallbackInfo<Value>& iArgs)
             // not detect where nulls have been supplied (or insufficient parameters
             // have been supplied), but the corresponding parameter cannot accept
             // a null.  This will trigger an exception during invocation.
-			if (iArgs.Length() <= parametersInfo->Length)
+			if (suppliedArguments->Length <= parametersInfo->Length)
 			{
 				int match = 0;
 				int failed = 0;
@@ -719,7 +732,8 @@ JavascriptInterop::Invoker(const v8::FunctionCallbackInfo<Value>& iArgs)
 				arguments = gcnew cli::array<System::Object^>(parametersInfo->Length);  // trailing parameters will be null
 				for (int p = 0; p < suppliedArguments->Length; p++)
 				{
-					System::Type^ paramType = parametersInfo[p]->ParameterType;
+                    System::Reflection::ParameterInfo^ parameter = parametersInfo[p];
+					System::Type^ paramType = parameter->ParameterType;
 
 					if (suppliedArguments[p] != nullptr)
 					{
@@ -740,7 +754,19 @@ JavascriptInterop::Invoker(const v8::FunctionCallbackInfo<Value>& iArgs)
 							}
 						}
 					}
+                    else if (parameter->IsOptional && parameter->HasDefaultValue && iArgs[p]->IsUndefined())
+                    {
+                        // pass default value if parameter is optional and undefined was supplied as an argument
+                        arguments[p] = parameter->DefaultValue;
+                    }
 				}
+                for (int p = suppliedArguments->Length; p < arguments->Length; p++)
+                {
+                    // pass default values if there are optional parameters
+                    System::Reflection::ParameterInfo^ parameter = parametersInfo[p];
+                    if (parameter->IsOptional && parameter->HasDefaultValue)
+                        arguments[p] = parameter->DefaultValue;
+                }
 
 				// skip if a conversion failed
 				if (failed > 0)

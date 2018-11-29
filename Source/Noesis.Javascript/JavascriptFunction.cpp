@@ -31,7 +31,7 @@ JavascriptFunction::~JavascriptFunction()
 	{
 		if (mContext)
 		{
-			JavascriptScope scope(mContext);
+            JavascriptScope scope(mContext);
 			mFuncHandle->Reset();
 		}
 		delete mFuncHandle;
@@ -39,9 +39,19 @@ JavascriptFunction::~JavascriptFunction()
 	}
 }
 
+JavascriptFunction::!JavascriptFunction()
+{
+    delete this;
+}
+
 System::Object^ JavascriptFunction::Call(... cli::array<System::Object^>^ args)
 {
-	JavascriptScope scope(mContext);
+    if (mFuncHandle == nullptr)
+        throw gcnew JavascriptException(L"This function's owning JavascriptContext has been disposed");
+    if (!args)
+        throw gcnew System::ArgumentNullException("args");
+	
+    JavascriptScope scope(mContext);
 	v8::Isolate* isolate = mContext->GetCurrentIsolate();
 	HandleScope handleScope(isolate);
 
@@ -65,9 +75,17 @@ System::Object^ JavascriptFunction::Call(... cli::array<System::Object^>^ args)
 
 bool JavascriptFunction::operator==(JavascriptFunction^ func1, JavascriptFunction^ func2)
 {
-	if(ReferenceEquals(func2, nullptr)) {
+    bool func1_null = ReferenceEquals(func1, nullptr),
+         func2_null = ReferenceEquals(func2, nullptr);
+    if (func1_null != func2_null)
 		return false;
-	}
+    if (func1_null && func2_null)
+        return true;
+    if (func1->mFuncHandle == nullptr)
+        throw gcnew JavascriptException(L"'func1's owning JavascriptContext has been disposed");
+    if (func2->mFuncHandle == nullptr)
+        throw gcnew JavascriptException(L"'func2's owning JavascriptContext has been disposed");
+
 	Handle<Function> jsFuncPtr1 = func1->mFuncHandle->Get(func1->mContext->GetCurrentIsolate());
 	Handle<Function> jsFuncPtr2 = func2->mFuncHandle->Get(func2->mContext->GetCurrentIsolate());
 
@@ -81,7 +99,12 @@ bool JavascriptFunction::Equals(JavascriptFunction^ other)
 
 bool JavascriptFunction::Equals(Object^ other)
 {
-	JavascriptFunction^ otherFunc = dynamic_cast<JavascriptFunction^>(other);
+    if (mFuncHandle == nullptr)
+        throw gcnew JavascriptException(L"This function's owning JavascriptContext has been disposed");
+    JavascriptFunction^ otherFunc = dynamic_cast<JavascriptFunction^>(other);
+    if (otherFunc != nullptr && otherFunc->mFuncHandle == nullptr)
+        throw gcnew JavascriptException(L"This function's owning JavascriptContext has been disposed");
+
 	return (otherFunc && this->Equals(otherFunc));
 }
 

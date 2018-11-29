@@ -225,7 +225,7 @@ protected:
 
 	// Stores every JavascriptFunction we create.  Ensures we dispose of them
 	// all.
-	System::Collections::Generic::List<System::Object ^> ^mFunctions;
+	System::Collections::Generic::List<System::WeakReference ^> ^mFunctions;
 
 	// See comment for TerminateExecution().
 	bool terminateRuns;
