@@ -3,7 +3,6 @@ using Newtonsoft.Json;
 using Noesis.Javascript.Debugging;
 using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -22,12 +21,34 @@ namespace Noesis.Javascript.Tests
         {
             context = new JavascriptContext();
             debugContext = new DebugContext(context);
+            DebuggerEnable();
+        }
+
+        private void DebuggerEnable()
+        {
+            string debuggerEnableMessage = JsonConvert.SerializeObject(new
+            {
+                id = debugContext.GetNextMessageId(),
+                method = "Debugger.enable"
+            });
+            debugContext.SendProtocolMessage(debuggerEnableMessage);
         }
 
         [TestCleanup]
         public void TearDown()
         {
+            //DebuggerDisable();
             context.Dispose();
+        }
+
+        private void DebuggerDisable()
+        {
+            string debuggerDisableMessage = JsonConvert.SerializeObject(new
+            {
+                id = debugContext.GetNextMessageId(),
+                method = "Debugger.disable"
+            });
+            debugContext.SendProtocolMessage(debuggerDisableMessage);
         }
 
         private class Message
@@ -342,6 +363,12 @@ function activeWait(seconds)
                     var debuggerReady = new SemaphoreSlim(0);
                     var taskJsContext = new JavascriptContext();
                     var taskDebugContext = new DebugContext(taskJsContext);
+                    string debuggerEnableMessage = JsonConvert.SerializeObject(new
+                    {
+                        id = debugContext.GetNextMessageId(),
+                        method = "Debugger.enable"
+                    });
+                    taskDebugContext.SendProtocolMessage(debuggerEnableMessage);
                     var debugTask = Task.Run(() =>
                     {
                         taskDebugContext.Debug(code, (s) =>
@@ -1244,13 +1271,12 @@ function activeWait(seconds)
                     uncaught = false
                 }
             };
-            
+
             // execute script
             debuggerSession.ScriptTask = Task.Run(() =>
             {
                 try
                 {
-
                     debuggerSession.ResultAfterFinished = debugContext.Debug(code, (s) =>
                     {
                         var m = new Message(s);

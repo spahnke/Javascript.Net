@@ -25,6 +25,7 @@ namespace Noesis
             {
             public:
                 DebugContext(JavascriptContext^ javascriptContext);
+                ~DebugContext();
 
                 // Starts a new debugging session
                 System::Object^ Debug(System::String^ script, System::Action<System::String^>^ OnNotificationHandler);
@@ -47,9 +48,7 @@ namespace Noesis
                 unsigned int messageIdCounter;
                 System::Action<System::String^>^ ExternalOnNotificationHandler;
                 
-                void InitializeDebugger();
                 void OnNotificationHandler(System::String^ message);
-                System::String^ SendProtocolMessageInternal(System::String^ messag);
                 literal System::String^ DEBUGGER_CONTEXT_NAME = "Debugger Context Name";
             };
         }
