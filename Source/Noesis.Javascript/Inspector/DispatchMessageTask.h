@@ -14,10 +14,12 @@ namespace Noesis
             private class DispatchMessageTask : public v8::Task
             {
             public:
+                DispatchMessageTask(MessageChannel& channel, bool terminateExecution);
                 DispatchMessageTask(MessageChannel& channel, System::String^ message);
                 void Run() override;
                 
             private:
+                bool terminateExecution;
                 MessageChannel& channel;
                 gcroot<System::String^> message;
             };

@@ -9,13 +9,20 @@ namespace Noesis
         namespace Debugging
         {
             DispatchMessageTask::DispatchMessageTask(MessageChannel& channel, System::String^ message)
-                : channel(channel), message(message)
+                : channel(channel), message(message), terminateExecution(false)
             {
             }
 
+            DispatchMessageTask::DispatchMessageTask(MessageChannel& channel, bool terminateExecution)
+                : channel(channel), terminateExecution(terminateExecution)
+            {}
+
             void DispatchMessageTask::Run()
             {
-                this->channel.DispatchProtocolMessage(this->message);
+                if (this->terminateExecution)
+                    this->channel.Resume();
+                else
+                    this->channel.DispatchProtocolMessage(this->message);
             }
         }
     }

@@ -5,6 +5,7 @@
 #include "v8-platform.h"
 #include "BackChannelDelegate.h"
 #include "MessageChannel.h"
+#include "DispatchMessageTask.h"
 
 namespace Noesis
 {
@@ -35,6 +36,7 @@ namespace Noesis
                 const int CONTEXT_GROUP_ID = 1;
 
             private:
+                void CallTaskOnCurrentExecutionTask(DispatchMessageTask& task);
                 v8::Isolate& isolate;
                 v8::Platform& platform;
                 bool terminated;

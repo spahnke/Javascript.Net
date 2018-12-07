@@ -30,9 +30,7 @@ namespace Noesis
                 this->terminated = false;
                 running_nested_loop = true;
                 while (!this->terminated) {
-                    while (v8::platform::PumpMessageLoop(&platform, &isolate)) {
-                        // wait until message received
-                    }
+                    v8::platform::PumpMessageLoop(&platform, &isolate, v8::platform::MessageLoopBehavior::kWaitForWork);
                 }
                 this->terminated = false;
                 this->running_nested_loop = false;
@@ -41,6 +39,8 @@ namespace Noesis
             void InspectorClient::TerminateExecution() {
                 this->isolate.TerminateExecution();
                 this->quitMessageLoopOnPause();
+                DispatchMessageTask *task = new DispatchMessageTask(this->GetChannel(), true);
+                this->CallTaskOnCurrentExecutionTask(*task);
             }
 
             MessageChannel& InspectorClient::GetChannel()
@@ -84,7 +84,11 @@ namespace Noesis
             {
                 // this resource is released internally by V8
                 DispatchMessageTask *task = new DispatchMessageTask(this->GetChannel(), message);
-                this->platform.CallOnForegroundThread(&isolate, task);
+                this->CallTaskOnCurrentExecutionTask(*task);
+            }
+
+            void InspectorClient::CallTaskOnCurrentExecutionTask(DispatchMessageTask& task) {
+                this->platform.CallOnForegroundThread(&isolate, &task);
                 this->isolate.RequestInterrupt(InterruptCallback, nullptr);
             }
 

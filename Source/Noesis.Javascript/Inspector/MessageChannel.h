@@ -17,6 +17,7 @@ namespace Noesis
                 void DispatchProtocolMessage(System::String^ message);
                 void SchedulePauseOnNextStatement(System::String^ reason);
                 BackChannelDelegate^ GetBackChannelDelegate();
+                void Resume();
 
             private:
                 void sendResponse(int callId, std::unique_ptr<v8_inspector::StringBuffer> messageBuffer) override;

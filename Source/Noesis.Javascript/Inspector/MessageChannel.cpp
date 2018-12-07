@@ -23,6 +23,11 @@ namespace Noesis
                 this->session->dispatchProtocolMessage(view);
             }
 
+            void MessageChannel::Resume()
+            {
+                this->session->resume();
+            }
+
             void MessageChannel::SchedulePauseOnNextStatement(System::String^ reason)
             {
                 //TODO: Normaly there should be 2 different string views???
