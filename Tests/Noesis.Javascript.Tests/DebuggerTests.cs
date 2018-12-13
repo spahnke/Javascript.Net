@@ -207,20 +207,17 @@ namespace Noesis.Javascript.Tests
             return new Message(debugContext.SendProtocolMessage(stepOverMessage));
         }
 
-
-
-
         [TestMethod]
-        [ExpectedException(typeof(InvalidOperationException))]
-        public void SendProtocolMessage_BeforeDebugCall_ThrowsException()
+        public void SendInvalidProtocolMessage_WithoutDebugger_ThrowsException()
         {
-            debugContext.SendProtocolMessage("Message");
+            const string INVALID_JSON_MESSAGE = "{\"error\":{\"code\":-32700,\"message\":\"Message must be a valid JSON\"}}";
+            var result = debugContext.SendProtocolMessage("foo");
+            Assert.AreEqual(INVALID_JSON_MESSAGE, result);
         }
 
         [TestMethod]
         public void SendProtocolMessage_BeforeDebugStarted_ThrowsException()
         {
-            // is test stable?
             bool hasThrownException = false;
             SemaphoreSlim debuggerPausedLock = new SemaphoreSlim(0);
             Task task = Task.Run(() => debugContext.Debug("var foo = 42;", (s) =>
@@ -252,65 +249,14 @@ namespace Noesis.Javascript.Tests
         [TestMethod]
         public void GetNextMessageId_GetValue_IncrementedId()
         {
-            Assert.AreEqual(1U, debugContext.GetNextMessageId());
-            Assert.AreEqual(2U, debugContext.GetNextMessageId());
-            Assert.AreEqual(3U, debugContext.GetNextMessageId());
-        }
-
-        [TestMethod]
-        public void GetNextMessageId_ResetAfterDebugCall_IncrementsId()
-        {
-            // test increment
-            Assert.AreEqual(1U, debugContext.GetNextMessageId());
-            Assert.AreEqual(2U, debugContext.GetNextMessageId());
-            Assert.AreEqual(3U, debugContext.GetNextMessageId());
-            Assert.AreEqual(4U, debugContext.GetNextMessageId());
-
-            var scriptExecution = StartDebugHelper("var foo = 42;", (m) => { });
-
-            // test id (debug consume one id)
-            Assert.AreEqual(2U, debugContext.GetNextMessageId());
-            
-            // resume after hit breakpoint (run code until end)
-            SendDebuggerResumeMessage();    // consumes id
-            scriptExecution.ScriptTask.Wait();
-
-            // test id (debug consume second id)
-            Assert.AreEqual(5U, debugContext.GetNextMessageId());
-        }
-
-        [TestMethod]
-        public void DebugCall_OnlyOncePerDebugContext_ThrowsException()
-        {
-            // is test stable?
-            bool hasThrownException = false;
-            SemaphoreSlim debuggerPausedLock = new SemaphoreSlim(0);
-            var task = Task.Run(() => debugContext.Debug("var foo = 42;", (s) =>
+            using (var context = new JavascriptContext())
+            using (var localDebugContext = new DebugContext(context))
             {
-                var m = new Message(s);
-                switch (m.MessageObj.method.ToString())
-                {
-                    case "Debugger.scriptParsed":
-                        try
-                        {
-                            debugContext.Debug("var bar = 73;", (s1) => { });
-                        }
-                        catch (InvalidOperationException)
-                        {
-                            hasThrownException = true;
-                        }
-                        break;
-                    case "Debugger.paused":
-                        debuggerPausedLock.Release();
-                        break;
-                }
-            }));
-            debuggerPausedLock.Wait();
-            SendDebuggerResumeMessage();
-            task.Wait();
-            Assert.IsTrue(hasThrownException);
+                Assert.AreEqual(1U, localDebugContext.GetNextMessageId());
+                Assert.AreEqual(2U, localDebugContext.GetNextMessageId());
+                Assert.AreEqual(3U, localDebugContext.GetNextMessageId());
+            }
         }
-
 
         [TestMethod]
         public void DebuggerStart_UseScriptResourceName()

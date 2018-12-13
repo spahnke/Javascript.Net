@@ -156,7 +156,10 @@ namespace Noesis
                     {
                         this->debuggerState = DebuggerState::Started;
                     }
-                    this->ExternalOnNotificationHandler(message);
+                    if (this->ExternalOnNotificationHandler != nullptr)
+                    {
+                        this->ExternalOnNotificationHandler(message);
+                    }
                 }
                 catch (System::Exception^)
                 {

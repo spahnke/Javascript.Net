@@ -56,6 +56,9 @@ namespace Noesis
                 System::Diagnostics::Debug::WriteLine(System::String::Format("Notification: {0}", message));
 #endif
                 this->backChannelDelegate->SendNotification(message);
+                if (System::String::Compare(message, this->INVALID_JSON_MESSAGE) == 0) {
+                    this->backChannelDelegate->SendResponse(message);
+                }
             }
 
             void MessageChannel::flushProtocolNotifications()
