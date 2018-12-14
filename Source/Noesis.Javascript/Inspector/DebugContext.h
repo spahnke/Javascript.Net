@@ -11,9 +11,8 @@ namespace Noesis
         {
             private enum class DebuggerState
             {
-                Initializing = 0,
-                Started = 1,
-                Stopped = 2
+                Started = 0,
+                Stopped = 1
             };
             
             /// <summary>
@@ -37,9 +36,11 @@ namespace Noesis
                 // Sends additional messages during the debugging session to interact directly with the debugger
                 System::String^ SendProtocolMessage(System::String^ message);
                 
-                // Get next message id and incremet it locally
+                // Get next message id and increment it locally
                 unsigned int GetNextMessageId();
 
+                void SetPauseOnFirstStatement(bool breakOnStart);
+                
             private:
                 JavascriptContext^ javascriptContext;
                 DebuggerState debuggerState;
@@ -50,6 +51,7 @@ namespace Noesis
                 
                 void OnNotificationHandler(System::String^ message);
                 literal System::String^ DEBUGGER_CONTEXT_NAME = "Debugger Context Name";
+                bool breakOnStart;
             };
         }
     }

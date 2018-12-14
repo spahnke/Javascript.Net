@@ -23,6 +23,7 @@ namespace Noesis
                 this->debuggerStartSymbol = System::String::Format("DebuggerStart:{0}", System::Guid::NewGuid().ToString("B"));
                 this->messageIdCounter = MESSAGE_ID_START_COUNTER;
                 this->debuggerState = DebuggerState::Stopped;
+                this->breakOnStart = false;
 
                 JavascriptScope javascriptScope(this->javascriptContext);
 
@@ -43,15 +44,11 @@ namespace Noesis
 
             DebugContext::~DebugContext()
             {
-                // try release debugger state
-                if (this->debuggerState != DebuggerState::Stopped)
+                if (this->debuggerState == DebuggerState::Started)
                     this->debuggerState = DebuggerState::Stopped;
 
                 // disconnect (destroy context?) (implicite disable debugger)
                 this->inspectorClient->DisconnectFrontend();
-
-                // release debugger state
-                this->debuggerState = DebuggerState::Stopped;
             }
 
             /*
@@ -65,35 +62,27 @@ namespace Noesis
             System::Object^ DebugContext::Debug(System::String^ script, System::String^ scriptResourceName, System::Action<System::String^>^ OnNotificationHandler)
             {
                 if (script == nullptr)
-                {
                     throw gcnew System::ArgumentNullException("script");
-                }
                 if (OnNotificationHandler == nullptr)
-                {
                     throw gcnew System::ArgumentNullException("OnNotificationHandler");
-                }
-                if (this->debuggerState != DebuggerState::Stopped)
-                {
+                if (this->debuggerState == DebuggerState::Started)
                     throw gcnew System::InvalidOperationException("WrongDebuggerState");
-                }
 
-                this->debuggerState = DebuggerState::Initializing;
                 this->ExternalOnNotificationHandler = OnNotificationHandler;
                 try
                 {
                     JavascriptScope javascriptScope(this->javascriptContext);
                     v8::Isolate *isolate = this->javascriptContext->GetCurrentIsolate();
                     HandleScope scope(isolate);
-
+                    
                     // sends event "Debugger.paused" on first statement
-                    this->inspectorClient->SchedulePauseOnNextStatement(debuggerStartSymbol);
+                    if (this->breakOnStart)
+                        this->inspectorClient->SchedulePauseOnNextStatement(this->debuggerStartSymbol);
 
-                    // run script
+                    this->debuggerState = DebuggerState::Started;
                     System::Object^ result = scriptResourceName == nullptr
                         ? this->javascriptContext->Run(script)
                         : this->javascriptContext->Run(script, scriptResourceName);
-
-                    // release debugger state
                     this->debuggerState = DebuggerState::Stopped;
 
                     return result;
@@ -106,23 +95,16 @@ namespace Noesis
 
             void DebugContext::TerminateExecution()
             {
-                if (this->debuggerState != DebuggerState::Started)
-                {
+                if (this->debuggerState == DebuggerState::Stopped)
                     throw gcnew System::InvalidOperationException("WrongDebuggerState");
-                }
                 this->inspectorClient->TerminateExecution();
+                this->debuggerState = DebuggerState::Stopped;
             }
 
             System::String^ DebugContext::SendProtocolMessage(System::String^ message)
             {
                 if (message == nullptr)
-                {
                     throw gcnew System::ArgumentNullException("message");
-                }
-                if (this->debuggerState == DebuggerState::Initializing)
-                {
-                    throw gcnew System::InvalidOperationException("WrongDebuggerState");
-                }
                 
                 if (this->debuggerState == DebuggerState::Stopped)
                 {
@@ -133,7 +115,6 @@ namespace Noesis
                 }
                 else
                 {
-                    this->debuggerState = DebuggerState::Started;
                     this->inspectorClient->DispatchMessageFromFrontend(message);
                 }
 
@@ -147,15 +128,18 @@ namespace Noesis
             {
                 return this->messageIdCounter++;
             }
+
+            void DebugContext::SetPauseOnFirstStatement(bool breakOnStart)
+            {
+                if (this->debuggerState == DebuggerState::Started)
+                    throw gcnew System::InvalidOperationException("WrongDebuggerState");
+                this->breakOnStart = breakOnStart;
+            }
             
             void DebugContext::OnNotificationHandler(System::String^ message)
             {
                 try
                 {
-                    if (this->debuggerState == DebuggerState::Initializing && message->Contains(this->debuggerStartSymbol))
-                    {
-                        this->debuggerState = DebuggerState::Started;
-                    }
                     if (this->ExternalOnNotificationHandler != nullptr)
                     {
                         this->ExternalOnNotificationHandler(message);

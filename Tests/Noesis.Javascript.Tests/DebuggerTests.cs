@@ -13,6 +13,7 @@ namespace Noesis.Javascript.Tests
     {
         // See for messages: https://chromedevtools.github.io/devtools-protocol/tot/Debugger
 
+        private const string ScriptSource = "http://foo.bar/";
         private JavascriptContext context;
         private DebugContext debugContext;
 
@@ -21,6 +22,7 @@ namespace Noesis.Javascript.Tests
         {
             context = new JavascriptContext();
             debugContext = new DebugContext(context);
+            debugContext.SetPauseOnFirstStatement(true);
             DebuggerEnable();
         }
 
@@ -59,7 +61,7 @@ namespace Noesis.Javascript.Tests
                 MessageObj = JsonConvert.DeserializeObject(message);
             }
 
-            public string RawMessage{ get; set; }
+            public string RawMessage { get; set; }
 
             public dynamic MessageObj { get; set; }
         }
@@ -77,44 +79,60 @@ namespace Noesis.Javascript.Tests
             public object ResultAfterFinished { get; set; }
 
             public JavascriptException Exception { get; set; }
+
+            public Message FirstBreakpointResolved { get; set; }
         }
 
-        private DebuggerTask StartDebugHelper(string code, Action<Message> OnNotificationHandler)
+        private DebuggerTask StartDebugHelper(string code, Action<Message> OnNotificationHandler, string scriptSource = null)
         {
             bool useOnlyExternalHandler = false;
             var debuggerReady = new SemaphoreSlim(0);
             var debuggerSession = new DebuggerTask();
             debuggerSession.ScriptTask = Task.Run(() =>
             {
+                Action<string> action = (s) =>
+                {
+                    var m = new Message(s);
+                    if (useOnlyExternalHandler)
+                    {
+                        OnNotificationHandler(m);
+                    }
+                    else
+                    {
+                        switch (m.MessageObj.method.ToString())
+                        {
+                            case "Debugger.scriptParsed":
+                                debuggerSession.ScriptStatusNotification = m;
+                                debuggerSession.ScriptId = m.MessageObj.@params.scriptId.ToString();
+                                break;
+                            case "Debugger.scriptFailedToParse":
+                                debuggerSession.ScriptStatusNotification = m;
+                                debuggerReady.Release();
+                                break;
+                            case "Debugger.paused":
+                                debuggerSession.DebuggerPausedNotificationAfterStart = m;
+                                debuggerReady.Release();
+                                useOnlyExternalHandler = true;
+                                break;
+                            case "Debugger.breakpointResolved":
+                                if (debuggerSession.FirstBreakpointResolved == null)
+                                {
+                                    debuggerSession.FirstBreakpointResolved = m;
+                                }
+                                break;
+                        }
+                    }
+                };
                 try
                 {
-                    debuggerSession.ResultAfterFinished = debugContext.Debug(code, (s) =>
+                    if (string.IsNullOrEmpty(scriptSource))
                     {
-                        var m = new Message(s);
-                        if (useOnlyExternalHandler)
-                        {
-                            OnNotificationHandler(m);
-                        }
-                        else
-                        {
-                            switch (m.MessageObj.method.ToString())
-                            {
-                                case "Debugger.scriptParsed":
-                                    debuggerSession.ScriptStatusNotification = m;
-                                    debuggerSession.ScriptId = m.MessageObj.@params.scriptId.ToString();
-                                    break;
-                                case "Debugger.scriptFailedToParse":
-                                    debuggerSession.ScriptStatusNotification = m;
-                                    debuggerReady.Release();
-                                    break;
-                                case "Debugger.paused":
-                                    debuggerSession.DebuggerPausedNotificationAfterStart = m;
-                                    debuggerReady.Release();
-                                    useOnlyExternalHandler = true;
-                                    break;
-                            }
-                        }
-                    });
+                        debuggerSession.ResultAfterFinished = debugContext.Debug(code, action);
+                    }
+                    else
+                    {
+                        debuggerSession.ResultAfterFinished = debugContext.Debug(code, scriptSource, action);
+                    }
                 }
                 catch (JavascriptException e)
                 {
@@ -183,6 +201,21 @@ namespace Noesis.Javascript.Tests
             return new Message(debugContext.SendProtocolMessage(setBreakpointMessage));
         }
 
+        private Message SetBreakpointByUrl(uint lineNumber)
+        {
+            var resumeMessageRequest = JsonConvert.SerializeObject(new
+            {
+                id = debugContext.GetNextMessageId(),
+                method = "Debugger.setBreakpointByUrl",
+                @params = new
+                {
+                    lineNumber = lineNumber,
+                    url = ScriptSource
+                }
+            });
+            return new Message(debugContext.SendProtocolMessage(resumeMessageRequest));
+        }
+
         private Message SendRuntimeGetPropertiesMessage(string scriptId, string remoteObjectId)
         {
             var getPropertiesMessage = JsonConvert.SerializeObject(new
@@ -213,37 +246,6 @@ namespace Noesis.Javascript.Tests
             const string INVALID_JSON_MESSAGE = "{\"error\":{\"code\":-32700,\"message\":\"Message must be a valid JSON\"}}";
             var result = debugContext.SendProtocolMessage("foo");
             Assert.AreEqual(INVALID_JSON_MESSAGE, result);
-        }
-
-        [TestMethod]
-        public void SendProtocolMessage_BeforeDebugStarted_ThrowsException()
-        {
-            bool hasThrownException = false;
-            SemaphoreSlim debuggerPausedLock = new SemaphoreSlim(0);
-            Task task = Task.Run(() => debugContext.Debug("var foo = 42;", (s) =>
-            {
-                var m = new Message(s);
-                switch (m.MessageObj.method.ToString())
-                {
-                    case "Debugger.scriptParsed":
-                        try
-                        {
-                            debugContext.SendProtocolMessage("message");
-                        }
-                        catch (InvalidOperationException)
-                        {
-                            hasThrownException = true;
-                        }
-                        break;
-                    case "Debugger.paused":
-                        debuggerPausedLock.Release();
-                        break;
-                }
-            }));
-            debuggerPausedLock.Wait();
-            SendDebuggerResumeMessage();
-            task.Wait();
-            Assert.IsTrue(hasThrownException);
         }
 
         [TestMethod]
@@ -309,6 +311,7 @@ function activeWait(seconds)
                     var debuggerReady = new SemaphoreSlim(0);
                     var taskJsContext = new JavascriptContext();
                     var taskDebugContext = new DebugContext(taskJsContext);
+                    taskDebugContext.SetPauseOnFirstStatement(true);
                     string debuggerEnableMessage = JsonConvert.SerializeObject(new
                     {
                         id = debugContext.GetNextMessageId(),
@@ -336,7 +339,7 @@ function activeWait(seconds)
             }
             Task.WaitAll(tasks.ToArray());
         }
-        
+
         [TestMethod]
         public void DebuggerStart_ExceptionInNotificationHandler_ExceptionHasToBeIgnored()
         {
@@ -371,7 +374,7 @@ function activeWait(seconds)
             var debuggerReadyLock = new SemaphoreSlim(0);
 
             context.SetParameter("foo", "bar");
-            var scriptExecution = StartDebugHelper("var test = foo;", (m) => {  } );
+            var scriptExecution = StartDebugHelper("var test = foo;", (m) => { });
 
             // resume debugger (run code until end)
             SendDebuggerResumeMessage();
@@ -463,13 +466,13 @@ function activeWait(seconds)
                         break;
                 }
             }));
-            
+
             // wait until debugger started
             debuggerPausedLock.Wait();
-            
+
             // resume debugger (run code until end)
             SendDebuggerResumeMessage();
-            
+
             // wait until debugger stopped
             scriptExecution.Wait();
 
@@ -529,7 +532,7 @@ function activeWait(seconds)
                     jsException = e;
                 }
             });
-            
+
             // wait until debugger started
             debuggerLock.Wait();
 
@@ -543,7 +546,7 @@ function activeWait(seconds)
             Assert.AreEqual("SyntaxError: Invalid or unexpected token", jsException.Message);
             Assert.AreEqual(scriptFailedToParseNotificationExpected, scriptFailedToParseNotification.RawMessage);
         }
-        
+
         [TestMethod]
         [TestCategory("Specified")]
         [Description("Event: Debugger.paused")]
@@ -657,7 +660,7 @@ function activeWait(seconds)
                 method = "Debugger.resume"
             });
             var resumeMessageResponse = debugContext.SendProtocolMessage(resumeMessageRequest);
-            
+
             // wait until debugger stopped
             scriptExecution.ScriptTask.Wait();
 
@@ -665,7 +668,7 @@ function activeWait(seconds)
             Assert.AreEqual(expectedResumeNotification, resumeNotification.RawMessage);
             Assert.AreEqual(expectedResumeMessageResponse, resumeMessageResponse);
         }
-        
+
         [TestMethod]
         [TestCategory("Specified")]
         [Description("Method: Debugger.setBreakpoint / Event: Debugger.paused")]
@@ -743,7 +746,8 @@ function activeWait(seconds)
             SemaphoreSlim pauseHitBreakpointNotificaction = new SemaphoreSlim(0);
             Message pauseHitBreakpointNotificationMessage = null;
             // execute script
-            var scriptExecution = StartDebugHelper("var foo = 42;\nfoo;", (m) => {
+            var scriptExecution = StartDebugHelper("var foo = 42;\nfoo;", (m) =>
+            {
                 switch (m.MessageObj.method.ToString())
                 {
                     case "Debugger.paused":
@@ -904,9 +908,9 @@ function activeWait(seconds)
         public void DebuggerRemoveBreakpoint_ShouldNotHitBreakpont()
         {
             bool hasPausedByBreakpoint = false;
-           
+
             // execute script
-            var scriptExecution = StartDebugHelper("var foo = 42;\nfoo;", (m) => 
+            var scriptExecution = StartDebugHelper("var foo = 42;\nfoo;", (m) =>
             {
                 if (m.MessageObj.method.ToString() == "Debugger.paused")
                 {
@@ -931,7 +935,7 @@ function activeWait(seconds)
 
             // resume pause on start (maybe run code until end)
             SendDebuggerResumeMessage();
-            
+
             // script execution finished
             scriptExecution.ScriptTask.Wait();
 
@@ -978,7 +982,7 @@ function activeWait(seconds)
         {
             var evaluateResponseExpected = JsonConvert.SerializeObject(new
             {
-                id  = 4,
+                id = 4,
                 result = new
                 {
                     result = new
@@ -989,7 +993,7 @@ function activeWait(seconds)
                     }
                 }
             });
-            
+
             SemaphoreSlim pausedLock = new SemaphoreSlim(0);
             Message evaluateParsedScriptNotification = null;
             bool evaluateParsedScript = false;
@@ -1187,7 +1191,7 @@ function activeWait(seconds)
             // test it
             Assert.AreEqual("Error\n    at eval (eval at foo (unknown source), <anonymous>:1:2)\n    at foo (<anonymous>:2:2)\n    at <anonymous>:4:11", stack);
         }
-        
+
 
         [TestMethod]
         [TestCategory("Specified")]
@@ -1259,7 +1263,7 @@ function activeWait(seconds)
 
             // wait to start debugger
             debuggerReady.Wait();
-            
+
             // send setPauseOnExceptions message
             string setPauseOnExceptionsMessage = JsonConvert.SerializeObject(new
             {
@@ -1295,7 +1299,7 @@ function activeWait(seconds)
             //Assert.AreEqual(expectedData.data.objectId, dataOfException.type.ToString());
             Assert.AreEqual(expectedData.data.uncaught, (bool)dataOfException.uncaught);
         }
-        
+
         [TestMethod]
         [TestCategory("Specified")]
         [Description("Method: Debugger.stepOver")]
@@ -1329,7 +1333,7 @@ function activeWait(seconds)
             // test it
             Assert.AreEqual(3, (int)pauseNotification.MessageObj.@params.callFrames[0].location.lineNumber);
         }
-        
+
         [TestMethod]
         [TestCategory("Specified")]
         [Description("Method: Debugger.stepInto")]
@@ -1355,7 +1359,7 @@ function activeWait(seconds)
                 method = "Debugger.stepInto",
             });
             new Message(debugContext.SendProtocolMessage(stepIntoMessage));
-            
+
             // wait until step over produces next paused event
             pauseNotificationLock.Wait();
 
@@ -1400,13 +1404,13 @@ function activeWait(seconds)
 
             // hold on the line "var bar = 73" in the function
             SendDebuggerSetBreakpointMessage(scriptExecution.ScriptId, 1);
-            
+
             // resume debugger to hit bp
             SendDebuggerResumeMessage();
-            
+
             // wait for bp pause
             pauseBreakpointNotificationLock.Wait();
-            
+
             // step out of function
             string stepOutMessage = JsonConvert.SerializeObject(new
             {
@@ -1470,11 +1474,11 @@ function activeWait(seconds)
                         //[optional] objectId   => RemoteObjectId Remote object handle.
                     },
                     // Id of callframe that holds variable.
-                    callFrameId = pauseNotification.MessageObj.@params.callFrames[0].callFrameId.ToString() 
+                    callFrameId = pauseNotification.MessageObj.@params.callFrames[0].callFrameId.ToString()
                 }
             });
             var result = new Message(debugContext.SendProtocolMessage(setVariableValueMessage));
-            
+
             //SendRuntimeGetPropertiesMessage(scriptExecution.ScriptId, )
 
             // resume debugger (run until end)
@@ -1489,7 +1493,7 @@ function activeWait(seconds)
             //Assert.AreEqual(77, scriptExecution.ResultAfterFinished);
 
         }
-        
+
         [TestMethod]
         [TestCategory("Specified")]
         [Description("The debugger statment is: debugger;")]
@@ -1497,7 +1501,7 @@ function activeWait(seconds)
         {
             SemaphoreSlim pauseNotificationLock = new SemaphoreSlim(0);
             Message pauseNotification = null;
-            
+
             var scriptExecution = StartDebugHelper("var foo = 73;\ndebugger;\nvar bar = 42;", (m) =>
             {
                 if (m.MessageObj.method.ToString() == "Debugger.paused")
@@ -1506,7 +1510,7 @@ function activeWait(seconds)
                     pauseNotificationLock.Release();
                 }
             });
-            
+
             // resume debugger to hit debugger stm
             SendDebuggerResumeMessage();
 
@@ -1532,7 +1536,8 @@ function activeWait(seconds)
             SemaphoreSlim bpPauseNotificationLock = new SemaphoreSlim(0);
 
             context.SetParameter("foo", "42");
-            var scriptExecution = StartDebugHelper("foo = 73;\nfoo = 99;", (m) => {
+            var scriptExecution = StartDebugHelper("foo = 73;\nfoo = 99;", (m) =>
+            {
                 if (m.MessageObj.method.ToString() == "Debugger.paused")
                 {
                     pauseNotification = m;
@@ -1542,7 +1547,7 @@ function activeWait(seconds)
 
             // set bp on second line
             SendDebuggerSetBreakpointMessage(scriptExecution.ScriptId, 1);
-            
+
             // resume debugger to hit debugger stm
             SendDebuggerResumeMessage();
 
@@ -1558,6 +1563,40 @@ function activeWait(seconds)
             // test it
             Assert.AreEqual(73, context.GetParameter("foo"));
             Assert.AreEqual("Execution Terminated", scriptExecution.Exception.Message);
+        }
+
+        [TestMethod]
+        [TestCategory("Specified")]
+        [Description("Debugger.SetBreakpointByUrl")]
+        public void Debugger_SetBreakpointByUrl_HitBreakpoint()
+        {
+            Message startResumedAfterBreakNotification = null;
+            SemaphoreSlim startResumedAfterBreak = new SemaphoreSlim(0);
+
+            SetBreakpointByUrl(0);
+
+            context.SetParameter("foo", "42");
+            var scriptExecution = StartDebugHelper("foo = 73;\nfoo = 99;", (m) =>
+            {
+                if (m.MessageObj.method.ToString() == "Debugger.resumed")
+                {
+                    startResumedAfterBreakNotification = m;
+                    startResumedAfterBreak.Release();
+                }
+            }, ScriptSource);
+
+            // resume debugger to hit debugger stm
+            SendDebuggerResumeMessage();
+
+            // wait
+            startResumedAfterBreak.Wait();
+
+            // wait for debug task
+            scriptExecution.ScriptTask.Wait();
+
+            // test it
+            Assert.AreEqual(99, context.GetParameter("foo"));
+            Assert.IsTrue(scriptExecution.FirstBreakpointResolved.RawMessage.Contains(ScriptSource));
         }
     }
 }
