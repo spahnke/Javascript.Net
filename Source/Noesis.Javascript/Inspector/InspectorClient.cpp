@@ -17,6 +17,7 @@ namespace Noesis
             InspectorClient::InspectorClient(v8::Isolate& isolate, v8::Platform& platform)
                 : isolate(isolate), platform(platform)
             {
+                this->messageLoopTermination = false;
                 this->terminated = false;
                 this->running_nested_loop = false;
                 this->client = v8_inspector::V8Inspector::create(&isolate, this);
@@ -24,12 +25,12 @@ namespace Noesis
 
             void InspectorClient::runMessageLoopOnPause(int context_group_id)
             {
-                if (this->running_nested_loop) {
+                if (this->running_nested_loop || this->messageLoopTermination) {
                     return;
                 }
                 this->terminated = false;
                 running_nested_loop = true;
-                while (!this->terminated) {
+                while (!this->terminated && !this->messageLoopTermination) {
                     v8::platform::PumpMessageLoop(&platform, &isolate, v8::platform::MessageLoopBehavior::kWaitForWork);
                 }
                 this->terminated = false;
@@ -37,6 +38,7 @@ namespace Noesis
             }
 
             void InspectorClient::TerminateExecution() {
+                this->messageLoopTermination = true;
                 this->isolate.TerminateExecution();
                 this->quitMessageLoopOnPause();
                 DispatchMessageTask *task = new DispatchMessageTask(this->GetChannel(), true);

@@ -1598,5 +1598,50 @@ function activeWait(seconds)
             Assert.AreEqual(99, context.GetParameter("foo"));
             Assert.IsTrue(scriptExecution.FirstBreakpointResolved.RawMessage.Contains(ScriptSource));
         }
+
+        [TestMethod]
+        [TestCategory("Specified")]
+        [Description("Debugger.SetBreakpointByUrl")]
+        public void Debugger_StopAfterFirstPausedOnException_ExecutionShouldTerminate()
+        {
+            SemaphoreSlim pausedOnException = new SemaphoreSlim(0);
+
+            // send setPauseOnExceptions message
+            debugContext.SendProtocolMessage(JsonConvert.SerializeObject(new
+            {
+                id = debugContext.GetNextMessageId(),
+                method = "Debugger.setPauseOnExceptions",
+                @params = new
+                {
+                    state = "all"
+                }
+            }));
+
+            var scriptExecution = StartDebugHelper(@"try {
+
+    throw new Error('test');
+        } catch (e) {}
+throw new Error('test2');", (m) =>
+            {
+                if (m.MessageObj.method.ToString() == "Debugger.paused")
+                {
+                    pausedOnException.Release();
+                }
+            }, ScriptSource);
+
+            // resume debugger to hit exception stm
+            SendDebuggerResumeMessage();
+
+            pausedOnException.Wait();
+
+            // stop debugging
+            debugContext.TerminateExecution();
+
+            // wait for debug task
+            scriptExecution.ScriptTask.Wait();
+
+            // test it
+            Assert.AreEqual("Execution Terminated", scriptExecution.Exception.Message);
+        }
     }
 }

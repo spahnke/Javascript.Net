@@ -40,6 +40,7 @@ namespace Noesis
                 v8::Isolate& isolate;
                 v8::Platform& platform;
                 bool terminated;
+                bool messageLoopTermination;
                 bool running_nested_loop;
                 std::unique_ptr<v8_inspector::V8Inspector> client;
                 std::unique_ptr<MessageChannel> channel;
