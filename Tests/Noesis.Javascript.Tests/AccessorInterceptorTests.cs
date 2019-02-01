@@ -68,6 +68,9 @@ namespace Noesis.Javascript.Tests
 			{
 				this.internalDict = internalDict ?? new Dictionary<string, object>();
 			}
+
+            public bool Contains(string key) => internalDict.ContainsKey(key);
+            public void Remove(string key) => internalDict.Remove(key);
 			
 			public object this[string key]
 			{
@@ -127,7 +130,44 @@ test.prop.complex = complex;");
 			testObj.internalDict["foo"].Should().Be(42);
 		}
 
-		[TestMethod]
+        [TestMethod]
+        public void AccessingDictionaryOverObjectInManagedObject_AccessingNonExistentKeyReturnsUndefined()
+        {
+            DictionaryLike testObj = new DictionaryLike();
+
+            _context.SetParameter("test", testObj);
+            var result = _context.Run(@"test.foo === undefined;");
+
+            result.Should().Be(true);
+        }
+
+        [TestMethod]
+        public void AccessingDictionaryOverObjectInManagedObject_AccessingANullValueReturnsNull()
+        {
+            DictionaryLike testObj = new DictionaryLike();
+            testObj.internalDict["foo"] = null;
+
+            _context.SetParameter("test", testObj);
+            var result = _context.Run(@"test.foo === null;");
+
+            result.Should().Be(true);
+        }
+
+        [TestMethod]
+        public void AccessingDictionaryOverObjectInManagedObject_SettingAnEntryToUndefinedDeletesTheEntryFromTheDictionary()
+        {
+            DictionaryLike testObj = new DictionaryLike();
+            testObj.internalDict["foo"] = 42;
+
+            testObj.internalDict.Count.Should().Be(1);
+
+            _context.SetParameter("test", testObj);
+            var result = _context.Run(@"test.foo = undefined;");
+
+            testObj.internalDict.Count.Should().Be(0);
+        }
+
+        [TestMethod]
 		public void AccessingDictionaryOverObjectInManagedObject2()
 		{
 			DictionaryLike testObj = new DictionaryLike();

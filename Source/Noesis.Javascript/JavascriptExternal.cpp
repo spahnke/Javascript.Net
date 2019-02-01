@@ -147,7 +147,16 @@ JavascriptExternal::GetProperty(wstring iName, Handle<Value> &result)
 			}
 			else
 			{
-				result = JavascriptInterop::ConvertToV8(indexerInfo->GetValue(self, gcnew cli::array<System::String^> { gcnew System::String(iName.c_str()) }));
+                // We have an indexer so we can assume we have a Contains method
+                MethodInfo^ containsMethod = type->GetMethod("Contains");
+                if ((bool) containsMethod->Invoke(self, gcnew cli::array<System::Object^> { gcnew System::String(iName.c_str()) }))
+                {
+                    result = JavascriptInterop::ConvertToV8(indexerInfo->GetValue(self, gcnew cli::array<System::String^> { gcnew System::String(iName.c_str()) }));
+                }
+                else
+                {
+                    result = v8::Undefined(isolate);
+                }
 			}
 			return true;
 		}
@@ -246,7 +255,17 @@ JavascriptExternal::SetProperty(wstring iName, Handle<Value> iValue)
 			}
 			else
 			{
-				indexerInfo->SetValue(self, JavascriptInterop::ConvertFromV8(iValue), gcnew cli::array<System::String^> { gcnew System::String(iName.c_str()) });
+                // We have an indexer so we can assume we have a Remove method
+                MethodInfo^ removeMethod = type->GetMethod("Remove");
+                if (iValue->IsUndefined())
+                {
+                    removeMethod->Invoke(self, gcnew cli::array<System::Object^> { gcnew System::String(iName.c_str()) });
+                }
+                else
+                {
+                    indexerInfo->SetValue(self, JavascriptInterop::ConvertFromV8(iValue), gcnew cli::array<System::String^> { gcnew System::String(iName.c_str()) });
+                }
+				
 			}
 			return iValue;
 		}
