@@ -292,6 +292,10 @@ JavascriptContext::SetParameter(System::String^ iName, System::Object^ iObject, 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+generic <typename AssociatedType> void JavascriptContext::SetConstructor(System::String^ name, System::Delegate^ constructor)
+{
+    SetConstructor(name, AssociatedType::typeid, constructor);
+}
 
 void JavascriptContext::SetConstructor(System::String^ name, System::Type^ associatedType, System::Delegate^ constructor)
 {
