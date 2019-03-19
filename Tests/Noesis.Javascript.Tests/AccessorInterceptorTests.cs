@@ -49,6 +49,13 @@ namespace Noesis.Javascript.Tests
         }
 
         [TestMethod]
+        public void ClassWithIndexer_IndexerIsIgnoredDuringEnumeration()
+        {
+            _context.SetParameter("myObject", new ClassWithIndexer { Index = 1, Value = "asdf" });
+            _context.Run("JSON.stringify(myObject)").Should().Be("{\"Index\":1,\"Value\":\"asdf\"}");
+        }
+
+        [TestMethod]
         public void AccessingByIndexAPropertyInAManagedObject()
         {
             _context.SetParameter("myObject", new ClassWithIndexer { Value = "Value"});
