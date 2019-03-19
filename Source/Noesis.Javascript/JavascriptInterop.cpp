@@ -273,21 +273,21 @@ JavascriptInterop::WrapObject(System::Object^ iObject)
 {
 	JavascriptContext^ context = JavascriptContext::GetCurrent();
 
-	if (context != nullptr)
-	{
-		Handle<FunctionTemplate> templ = context->GetObjectWrapperConstructorTemplate(iObject->GetType());
-		v8::Isolate *isolate = JavascriptContext::GetCurrentIsolate();
+    if (context != nullptr)
+    {
+        Handle<FunctionTemplate> templ = context->GetObjectWrapperConstructorTemplate(iObject->GetType());
+        v8::Isolate *isolate = JavascriptContext::GetCurrentIsolate();
         Handle<ObjectTemplate> instanceTemplate = templ->InstanceTemplate();
-		Handle<Object> object = instanceTemplate->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+        Handle<Object> object = instanceTemplate->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
         JavascriptExternal *external = context->WrapObject(iObject);
         object->SetInternalField(0, External::New(isolate, external));
 
-        Handle<Function> toJSON = external->GetMethod(L"ToJSON");
+        Handle<FunctionTemplate> toJSON = external->GetMethodTemplate(L"ToJSON");
         if (!toJSON.IsEmpty())
-            object->Set(String::NewFromUtf8(isolate, "toJSON"), toJSON);
+            templ->Set(String::NewFromUtf8(isolate, "toJSON"), toJSON);
 
-		return object;
-	}
+        return object;
+    }
 
 	throw gcnew System::Exception("No context currently active.");
 }
@@ -381,7 +381,7 @@ JavascriptInterop::ConvertObjectFromV8(Handle<Object> iObject, ConvertedObjects 
  * and assumes incorrectly that Germany observed UTC+2 during the summer time.
  *
  * V8
- * new Date(1978, 5, 15) // "Thu Jun 15 1978 00:00:00 GMT+0100 (Mitteleurop‰ische Normalzeit)"
+ * new Date(1978, 5, 15) // "Thu Jun 15 1978 00:00:00 GMT+0100 (Mitteleurop√§ische Normalzeit)"
  *
  * C#
  * If we get the ticks since 1970-01-01 from V8 to construct a UTC DateTime object we get
@@ -712,8 +712,6 @@ void
 JavascriptInterop::Setter(Local<String> iName, Local<Value> iValue, const PropertyCallbackInfo<Value>& iInfo)
 {
 	wstring name = (wchar_t*) *String::Value(JavascriptContext::GetCurrentIsolate(), iName);
-    if (name == L"toJSON" && iValue->IsFunction())
-        return;
 	Handle<External> external = Handle<External>::Cast(iInfo.Holder()->GetInternalField(0));
 	JavascriptExternal* wrapper = (JavascriptExternal*) external->Value();
 
