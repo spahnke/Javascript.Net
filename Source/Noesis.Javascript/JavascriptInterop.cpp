@@ -737,6 +737,8 @@ void JavascriptInterop::Enumerator(const PropertyCallbackInfo<Array>& iInfo)
         PropertyInfo^ member = members[i];
         if (member->GetCustomAttributes(DoNotEnumerate::typeid, false)->Length > 0)
             continue;
+        if (member->Name == "Item" && member->GetIndexParameters()->Length > 0)
+            continue; // skip indexer properties
         result_names->Set(i, JavascriptInterop::ConvertToV8(member->Name));
 	}
 
