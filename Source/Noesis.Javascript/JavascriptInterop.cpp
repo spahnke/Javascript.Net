@@ -48,6 +48,13 @@ namespace Noesis { namespace Javascript {
         DoNotEnumerate() {}
     };
 
+    [System::AttributeUsageAttribute(System::AttributeTargets::Method)]
+    public ref class ObjectKeys : public System::Attribute
+    {
+    public:
+        ObjectKeys() {}
+    };
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 using namespace std;
@@ -381,7 +388,7 @@ JavascriptInterop::ConvertObjectFromV8(Handle<Object> iObject, ConvertedObjects 
  * and assumes incorrectly that Germany observed UTC+2 during the summer time.
  *
  * V8
- * new Date(1978, 5, 15) // "Thu Jun 15 1978 00:00:00 GMT+0100 (Mitteleurop√§ische Normalzeit)"
+ * new Date(1978, 5, 15) // "Thu Jun 15 1978 00:00:00 GMT+0100 (Mitteleurop‰ische Normalzeit)"
  *
  * C#
  * If we get the ticks since 1970-01-01 from V8 to construct a UTC DateTime object we get
@@ -717,7 +724,13 @@ JavascriptInterop::Setter(Local<String> iName, Local<Value> iValue, const Proper
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
+System::Reflection::MethodInfo^ GetObjectKeysMethod(System::Object^ self)
+{
+    for each (auto method in self->GetType()->GetMethods())
+        if (method->GetCustomAttributes(ObjectKeys::typeid, false)->Length > 0)
+            return method;
+    return nullptr;
+}
 
 void JavascriptInterop::Enumerator(const PropertyCallbackInfo<Array>& iInfo)
 {
@@ -727,12 +740,25 @@ void JavascriptInterop::Enumerator(const PropertyCallbackInfo<Array>& iInfo)
 
 	System::Object^ self = wrapper->GetObject();
 	System::Type^ type = self->GetType();
-
-	cli::array<PropertyInfo^>^ members = type->GetProperties(System::Reflection::BindingFlags::Public | System::Reflection::BindingFlags::Instance);
 	
 	v8::Isolate* isolate = v8::Isolate::GetCurrent();
 	EscapableHandleScope handle_scope(isolate);
-	Local<Array> result_names = Array::New(isolate, members->Length);
+
+    auto getObjectKeysMethod = GetObjectKeysMethod(self);
+    if (getObjectKeysMethod != nullptr)
+    {
+        auto keys = safe_cast<cli::array<System::String^>^>(getObjectKeysMethod->Invoke(self, nullptr));
+        auto result_names = Array::New(isolate, keys->Length);
+
+        for (int i = 0; i < keys->Length; i++)
+            result_names->Set(i, JavascriptInterop::ConvertToV8(keys[i]));
+
+        iInfo.GetReturnValue().Set<Array>(handle_scope.Escape(result_names));
+        return;
+    }
+
+	cli::array<PropertyInfo^>^ members = type->GetProperties(System::Reflection::BindingFlags::Public | System::Reflection::BindingFlags::Instance);
+    Local<Array> result_names = Array::New(isolate, members->Length);
 	
 	for (int i = 0; i < members->Length; i++)
 	{
