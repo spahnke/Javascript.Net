@@ -41,6 +41,13 @@
 
 namespace Noesis { namespace Javascript {
 
+    [System::AttributeUsageAttribute(System::AttributeTargets::Property | System::AttributeTargets::Field)]
+    public ref class DoNotEnumerate : public System::Attribute
+    {
+    public:
+        DoNotEnumerate() {}
+    };
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 using namespace std;
@@ -725,6 +732,8 @@ void JavascriptInterop::Enumerator(const PropertyCallbackInfo<Array>& iInfo)
 	for (int i = 0; i < members->Length; i++)
 	{
         PropertyInfo^ member = members[i];
+        if (member->GetCustomAttributes(DoNotEnumerate::typeid, false)->Length > 0)
+            continue;
         result_names->Set(i, JavascriptInterop::ConvertToV8(member->Name));
 	}
 
