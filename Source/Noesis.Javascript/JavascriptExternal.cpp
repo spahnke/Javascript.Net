@@ -72,6 +72,31 @@ JavascriptExternal::GetObject()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+Handle<FunctionTemplate>
+JavascriptExternal::GetMethodTemplate(wstring iName)
+{
+    v8::Isolate *isolate = JavascriptContext::GetCurrentIsolate();
+
+    System::Object^ self = mObjectHandle.Target;
+    System::Type^ type = self->GetType();
+    System::String^ memberName = gcnew System::String(iName.c_str());
+    cli::array<System::Object^>^ objectInfo = gcnew cli::array<System::Object^>(2);
+    objectInfo->SetValue(self, 0);
+    objectInfo->SetValue(memberName, 1);
+
+    // Verification if it a method
+    cli::array<MemberInfo^>^ members = type->GetMember(memberName);
+    if (members->Length > 0 && members[0]->MemberType == MemberTypes::Method)
+    {
+        JavascriptContext^ context = JavascriptContext::GetCurrent();
+        Handle<External> external = External::New(isolate, context->WrapObject(objectInfo));
+        return FunctionTemplate::New(isolate, JavascriptInterop::Invoker, external);
+    }
+
+    // Wasn't an method
+    return  Handle<FunctionTemplate>();
+}
+
 Handle<Function>
 JavascriptExternal::GetMethod(wstring iName)
 {
@@ -83,28 +108,17 @@ JavascriptExternal::GetMethod(wstring iName)
 		return Local<Function>::New(isolate, *(method.Pointer));
 	else
 	{
-		System::Object^ self = mObjectHandle.Target;
-		System::Type^ type = self->GetType();
-		System::String^ memberName = gcnew System::String(iName.c_str());
-		cli::array<System::Object^>^ objectInfo = gcnew cli::array<System::Object^>(2);
-		objectInfo->SetValue(self,0);
-		objectInfo->SetValue(memberName,1);
+        auto functionTemplate = GetMethodTemplate(iName);
+        if (!functionTemplate.IsEmpty())
+        {
+            Handle<Function> function = functionTemplate->GetFunction();
 
-		// Verification if it a method
-		cli::array<MemberInfo^>^ members = type->GetMember(memberName);
-		if (members->Length > 0 && members[0]->MemberType == MemberTypes::Method)
-		{
-			JavascriptContext^ context = JavascriptContext::GetCurrent();
-			Handle<External> external = External::New(isolate, context->WrapObject(objectInfo));
-			Handle<FunctionTemplate> functionTemplate = FunctionTemplate::New(isolate, JavascriptInterop::Invoker, external);
-			Handle<Function> function = functionTemplate->GetFunction();
+            Persistent<Function> *function_ptr = new Persistent<Function>(isolate, function);
+            WrappedMethod wrapped(function_ptr);
+            methods[memberName] = wrapped;
 
-			Persistent<Function> *function_ptr = new Persistent<Function>(isolate, function);
-			WrappedMethod wrapped(function_ptr);
-			methods[memberName] = wrapped;
-
-			return function;
-		}
+            return function;
+        }
 	}
 	
 	// Wasn't an method

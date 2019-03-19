@@ -4,6 +4,7 @@ using System;
 using System.Dynamic;
 using System.Collections.Generic;
 using System.Collections;
+using System.Linq;
 
 namespace Noesis.Javascript.Tests
 {
@@ -91,6 +92,9 @@ namespace Noesis.Javascript.Tests
             {
                 return internalDict;
             }
+
+            [ObjectKeys]
+            public string[] GetKeys() => internalDict.Keys.ToArray();
         }
 
         [TestMethod]
@@ -98,6 +102,26 @@ namespace Noesis.Javascript.Tests
         {
             _context.SetParameter("myObject", new ClassWithDictionary { prop = new DictionaryLike(new Dictionary<string, object> { { "test", 42 } }) });
             _context.Run("JSON.stringify(myObject)").Should().Be("{\"prop\":{\"test\":42}}");
+        }
+
+        [TestMethod]
+        public void ObjectKeys()
+        {
+            var iObject = new ClassWithDictionary { prop = new DictionaryLike(new Dictionary<string, object> { { "test", 42 } }) };
+            _context.SetParameter("myObject", iObject);
+            var result = _context.Run("Object.keys(myObject.prop)");
+            result.Should().BeOfType<object[]>().Which.Should().HaveCount(1);
+            ((object[]) result)[0].Should().Be("test");
+        }
+
+        [TestMethod]
+        public void ObjectGetOwnPropertyNames()
+        {
+            var iObject = new ClassWithDictionary { prop = new DictionaryLike(new Dictionary<string, object> { { "test", 42 } }) };
+            _context.SetParameter("myObject", iObject);
+            var result = _context.Run("Object.getOwnPropertyNames(myObject.prop)");
+            result.Should().BeOfType<object[]>().Which.Should().HaveCount(1);
+            ((object[]) result)[0].Should().Be("test");
         }
 
         [TestMethod]
@@ -200,7 +224,7 @@ test.prop.complex = complex;");
 			testObj.internalDict["foo"].Should().Be("bar");
 		}
 
-		class ClassWithProperty
+        class ClassWithProperty
         {
             public string MyProperty { get; set; }
 

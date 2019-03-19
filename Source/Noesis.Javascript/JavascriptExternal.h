@@ -73,6 +73,8 @@ public:
 
 	System::Object^ GetObject();
 
+    Handle<FunctionTemplate> GetMethodTemplate(wstring iName);
+
 	Handle<Function> GetMethod(wstring iName);
 
 	Handle<Function> GetMethod(Handle<String> iName);

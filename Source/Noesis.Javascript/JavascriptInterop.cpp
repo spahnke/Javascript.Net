@@ -48,6 +48,13 @@ namespace Noesis { namespace Javascript {
         DoNotEnumerate() {}
     };
 
+    [System::AttributeUsageAttribute(System::AttributeTargets::Method)]
+    public ref class ObjectKeys : public System::Attribute
+    {
+    public:
+        ObjectKeys() {}
+    };
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 using namespace std;
@@ -273,21 +280,21 @@ JavascriptInterop::WrapObject(System::Object^ iObject)
 {
 	JavascriptContext^ context = JavascriptContext::GetCurrent();
 
-	if (context != nullptr)
-	{
-		Handle<FunctionTemplate> templ = context->GetObjectWrapperConstructorTemplate(iObject->GetType());
-		v8::Isolate *isolate = JavascriptContext::GetCurrentIsolate();
+    if (context != nullptr)
+    {
+        Handle<FunctionTemplate> templ = context->GetObjectWrapperConstructorTemplate(iObject->GetType());
+        v8::Isolate *isolate = JavascriptContext::GetCurrentIsolate();
         Handle<ObjectTemplate> instanceTemplate = templ->InstanceTemplate();
-		Handle<Object> object = instanceTemplate->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+        Handle<Object> object = instanceTemplate->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
         JavascriptExternal *external = context->WrapObject(iObject);
         object->SetInternalField(0, External::New(isolate, external));
 
-        Handle<Function> toJSON = external->GetMethod(L"ToJSON");
+        Handle<FunctionTemplate> toJSON = external->GetMethodTemplate(L"ToJSON");
         if (!toJSON.IsEmpty())
-            object->Set(String::NewFromUtf8(isolate, "toJSON"), toJSON);
+            templ->Set(String::NewFromUtf8(isolate, "toJSON"), toJSON);
 
-		return object;
-	}
+        return object;
+    }
 
 	throw gcnew System::Exception("No context currently active.");
 }
@@ -709,8 +716,6 @@ void
 JavascriptInterop::Setter(Local<String> iName, Local<Value> iValue, const PropertyCallbackInfo<Value>& iInfo)
 {
 	wstring name = (wchar_t*) *String::Value(JavascriptContext::GetCurrentIsolate(), iName);
-    if (name == L"toJSON" && iValue->IsFunction())
-        return;
 	Handle<External> external = Handle<External>::Cast(iInfo.Holder()->GetInternalField(0));
 	JavascriptExternal* wrapper = (JavascriptExternal*) external->Value();
 
@@ -719,7 +724,13 @@ JavascriptInterop::Setter(Local<String> iName, Local<Value> iValue, const Proper
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
+System::Reflection::MethodInfo^ GetObjectKeysMethod(System::Object^ self)
+{
+    for each (auto method in self->GetType()->GetMethods())
+        if (method->GetCustomAttributes(ObjectKeys::typeid, false)->Length > 0)
+            return method;
+    return nullptr;
+}
 
 void JavascriptInterop::Enumerator(const PropertyCallbackInfo<Array>& iInfo)
 {
@@ -729,12 +740,25 @@ void JavascriptInterop::Enumerator(const PropertyCallbackInfo<Array>& iInfo)
 
 	System::Object^ self = wrapper->GetObject();
 	System::Type^ type = self->GetType();
-
-	cli::array<PropertyInfo^>^ members = type->GetProperties(System::Reflection::BindingFlags::Public | System::Reflection::BindingFlags::Instance);
 	
 	v8::Isolate* isolate = v8::Isolate::GetCurrent();
 	EscapableHandleScope handle_scope(isolate);
-	Local<Array> result_names = Array::New(isolate, members->Length);
+
+    auto getObjectKeysMethod = GetObjectKeysMethod(self);
+    if (getObjectKeysMethod != nullptr)
+    {
+        auto keys = safe_cast<cli::array<System::String^>^>(getObjectKeysMethod->Invoke(self, nullptr));
+        auto result_names = Array::New(isolate, keys->Length);
+
+        for (int i = 0; i < keys->Length; i++)
+            result_names->Set(i, JavascriptInterop::ConvertToV8(keys[i]));
+
+        iInfo.GetReturnValue().Set<Array>(handle_scope.Escape(result_names));
+        return;
+    }
+
+	cli::array<PropertyInfo^>^ members = type->GetProperties(System::Reflection::BindingFlags::Public | System::Reflection::BindingFlags::Instance);
+    Local<Array> result_names = Array::New(isolate, members->Length);
 	
 	for (int i = 0; i < members->Length; i++)
 	{
