@@ -56,11 +56,27 @@ namespace Noesis.Javascript.Tests
             _context.Run("myObject[99] == 'Value 99'").Should().BeOfType<bool>().Which.Should().BeTrue();
         }
 
-        class ClassWithDictionary
+        class ClassWithToJSONMethod
+		{
+			public string Test { get; set; }
+
+            public object ToJSON()
+			{
+				return new int[] { 1, 2, 3, 4 };
+			}
+		}
+
+		[TestMethod]
+		public void ToJSONMethodIsUsedIfAvailable()
+		{
+			_context.SetParameter("myObject", new ClassWithToJSONMethod { Test = "asdf" });
+			_context.Run("JSON.stringify(myObject)").Should().Be("[1,2,3,4]");
+		}
+
+		class ClassWithDictionary
         {
             public DictionaryLike prop { get; set; }
         }
-
 
 		class DictionaryLike
 		{
@@ -76,9 +92,50 @@ namespace Noesis.Javascript.Tests
 				get => internalDict[key];
 				set => internalDict[key] = value;
 			}
-		}
 
-		[TestMethod]
+            public object ToJSON()
+            {
+                return internalDict;
+            }
+        }
+
+        [TestMethod]
+        public void DictionaryCanBeStringified()
+        {
+            _context.SetParameter("myObject", new ClassWithDictionary { prop = new DictionaryLike(new Dictionary<string, object> { { "test", 42 } }) });
+            _context.Run("JSON.stringify(myObject)").Should().Be("{\"prop\":{\"test\":42}}");
+        }
+
+        [TestMethod]
+        public void DictionaryCanBeStringifiedMultipleTimes()
+        {
+            _context.SetParameter("myObject", new ClassWithDictionary { prop = new DictionaryLike(new Dictionary<string, object> { { "test", 42 } }) });
+            _context.SetParameter("myObject2", new ClassWithDictionary { prop = new DictionaryLike(new Dictionary<string, object> { { "test", 23 } }) });
+            _context.Run("JSON.stringify(myObject)").Should().Be("{\"prop\":{\"test\":42}}");
+            _context.Run("JSON.stringify(myObject2)").Should().Be("{\"prop\":{\"test\":23}}");
+        }
+
+        [TestMethod]
+        public void ObjectKeys()
+        {
+            var iObject = new ClassWithDictionary { prop = new DictionaryLike(new Dictionary<string, object> { { "test", 42 } }) };
+            _context.SetParameter("myObject", iObject);
+            var result = _context.Run("Object.keys(myObject.prop)");
+            result.Should().BeOfType<object[]>().Which.Should().HaveCount(1);
+            ((object[]) result)[0].Should().Be("test");
+        }
+
+        [TestMethod]
+        public void ObjectGetOwnPropertyNames()
+        {
+            var iObject = new ClassWithDictionary { prop = new DictionaryLike(new Dictionary<string, object> { { "test", 42 } }) };
+            _context.SetParameter("myObject", iObject);
+            var result = _context.Run("Object.getOwnPropertyNames(myObject.prop)");
+            result.Should().BeOfType<object[]>().Which.Should().HaveCount(1);
+            ((object[]) result)[0].Should().Be("test");
+        }
+
+        [TestMethod]
         public void AccessingDictionaryInManagedObject()
         {
             var dict = new Dictionary<string, object> { { "bar", "33" }, { "baz", true } };

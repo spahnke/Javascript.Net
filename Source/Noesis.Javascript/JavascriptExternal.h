@@ -73,9 +73,9 @@ public:
 
 	System::Object^ GetObject();
 
-	Local<Function> GetMethod(wstring iName);
+    Local<Function> GetMethod(wstring iName);
 
-	Local<Function> GetMethod(Local<String> iName);
+    Local<Function> GetMethod(Local<String> iName);
 
 	bool GetProperty(wstring iName, Local<Value> &result);
 

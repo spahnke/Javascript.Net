@@ -260,22 +260,46 @@ JavascriptInterop::ConvertToV8(System::Object^ iObject)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: should return Local<External>
-Local<Object>
+void ToJSONCallback(const v8::FunctionCallbackInfo<Value>& iArgs)
+{
+    auto isolate = iArgs.GetIsolate();
+    auto self = (System::Object^) JavascriptInterop::UnwrapObject(Handle<External>::Cast(iArgs.Holder()->GetInternalField(0)));
+    auto getJSONMethod = self->GetType()->GetMethod("ToJSON");
+    iArgs.GetReturnValue().Set(JavascriptInterop::ConvertToV8(getJSONMethod->Invoke(self, nullptr)));
+}
+
+void AddToJSONMethod(Handle<FunctionTemplate> functionTemplate, System::Object^ object)
+{
+    auto self = object;
+    auto getJSONMethod = self->GetType()->GetMethod("ToJSON");
+    if (getJSONMethod == nullptr)
+        return;
+
+    auto isolate = JavascriptContext::GetCurrentIsolate();
+    auto toJSONTemplate = FunctionTemplate::New(isolate, ToJSONCallback);
+    functionTemplate->PrototypeTemplate()->Set(String::NewFromUtf8(isolate, "toJSON"), toJSONTemplate);
+}
+
+// TODO: should return Handle<External>
+Handle<Object>
 JavascriptInterop::WrapObject(System::Object^ iObject)
 {
 	JavascriptContext^ context = JavascriptContext::GetCurrent();
 
-	if (context != nullptr)
-	{
-		Local<FunctionTemplate> templ = context->GetObjectWrapperConstructorTemplate(iObject->GetType());
-		v8::Isolate *isolate = JavascriptContext::GetCurrentIsolate();
-        Local<ObjectTemplate> instanceTemplate = templ->InstanceTemplate();
-		Local<Object> object = instanceTemplate->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
-		object->SetInternalField(0, External::New(isolate, context->WrapObject(iObject)));
+    if (context != nullptr)
+    {
+        v8::Isolate *isolate = JavascriptContext::GetCurrentIsolate();
+        JavascriptExternal *external = context->WrapObject(iObject);
 
-		return object;
-	}
+        Handle<FunctionTemplate> templ = context->GetObjectWrapperConstructorTemplate(iObject->GetType());
+        AddToJSONMethod(templ, iObject);
+        
+        Handle<ObjectTemplate> instanceTemplate = templ->InstanceTemplate();
+        Handle<Object> object = instanceTemplate->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+        object->SetInternalField(0, External::New(isolate, external));
+
+        return object;
+    }
 
 	throw gcnew System::Exception("No context currently active.");
 }
@@ -369,7 +393,7 @@ JavascriptInterop::ConvertObjectFromV8(Local<Object> iObject, ConvertedObjects &
  * and assumes incorrectly that Germany observed UTC+2 during the summer time.
  *
  * V8
- * new Date(1978, 5, 15) // "Thu Jun 15 1978 00:00:00 GMT+0100 (Mitteleurop‰ische Normalzeit)"
+ * new Date(1978, 5, 15) // "Thu Jun 15 1978 00:00:00 GMT+0100 (Mitteleurop√§ische Normalzeit)"
  *
  * C#
  * If we get the ticks since 1970-01-01 from V8 to construct a UTC DateTime object we get
@@ -699,7 +723,7 @@ void
 JavascriptInterop::Setter(Local<String> iName, Local<Value> iValue, const PropertyCallbackInfo<Value>& iInfo)
 {
 	wstring name = (wchar_t*) *String::Value(JavascriptContext::GetCurrentIsolate(), iName);
-	Local<External> external = Local<External>::Cast(iInfo.Holder()->GetInternalField(0));
+	Handle<External> external = Handle<External>::Cast(iInfo.Holder()->GetInternalField(0));
 	JavascriptExternal* wrapper = (JavascriptExternal*) external->Value();
 
 	// set property
