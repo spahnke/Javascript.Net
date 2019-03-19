@@ -83,9 +83,21 @@ namespace Noesis.Javascript.Tests
 				get => internalDict[key];
 				set => internalDict[key] = value;
 			}
-		}
 
-		[TestMethod]
+            public object ToJSON(object key)
+            {
+                return internalDict;
+            }
+        }
+
+        [TestMethod]
+        public void ToJSONMethodIsUsedIfAvailable()
+        {
+            _context.SetParameter("myObject", new ClassWithDictionary { prop = new DictionaryLike(new Dictionary<string, object> { { "test", 42 } }) });
+            _context.Run("JSON.stringify(myObject)").Should().Be("{\"prop\":{\"test\":42}}");
+        }
+
+        [TestMethod]
         public void AccessingDictionaryInManagedObject()
         {
             var dict = new Dictionary<string, object> { { "bar", "33" }, { "baz", true } };

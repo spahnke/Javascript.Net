@@ -279,7 +279,12 @@ JavascriptInterop::WrapObject(System::Object^ iObject)
 		v8::Isolate *isolate = JavascriptContext::GetCurrentIsolate();
         Handle<ObjectTemplate> instanceTemplate = templ->InstanceTemplate();
 		Handle<Object> object = instanceTemplate->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
-		object->SetInternalField(0, External::New(isolate, context->WrapObject(iObject)));
+        JavascriptExternal *external = context->WrapObject(iObject);
+        object->SetInternalField(0, External::New(isolate, external));
+
+        Handle<Function> toJSON = external->GetMethod(L"ToJSON");
+        if (!toJSON.IsEmpty())
+            object->Set(String::NewFromUtf8(isolate, "toJSON"), toJSON);
 
 		return object;
 	}
@@ -707,6 +712,8 @@ void
 JavascriptInterop::Setter(Local<String> iName, Local<Value> iValue, const PropertyCallbackInfo<Value>& iInfo)
 {
 	wstring name = (wchar_t*) *String::Value(JavascriptContext::GetCurrentIsolate(), iName);
+    if (name == L"toJSON" && iValue->IsFunction())
+        return;
 	Handle<External> external = Handle<External>::Cast(iInfo.Holder()->GetInternalField(0));
 	JavascriptExternal* wrapper = (JavascriptExternal*) external->Value();
 
