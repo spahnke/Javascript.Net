@@ -49,6 +49,13 @@ namespace Noesis.Javascript.Tests
         }
 
         [TestMethod]
+        public void ClassWithIndexer_IndexerIsIgnoredDuringEnumeration()
+        {
+            _context.SetParameter("myObject", new ClassWithIndexer { Index = 1, Value = "asdf" });
+            _context.Run("JSON.stringify(myObject)").Should().Be("{\"Index\":1,\"Value\":\"asdf\"}");
+        }
+
+        [TestMethod]
         public void AccessingByIndexAPropertyInAManagedObject()
         {
             _context.SetParameter("myObject", new ClassWithIndexer { Value = "Value"});
@@ -79,9 +86,21 @@ namespace Noesis.Javascript.Tests
 				get => internalDict[key];
 				set => internalDict[key] = value;
 			}
-		}
 
-		[TestMethod]
+            public object ToJSON(object key)
+            {
+                return internalDict;
+            }
+        }
+
+        [TestMethod]
+        public void ToJSONMethodIsUsedIfAvailable()
+        {
+            _context.SetParameter("myObject", new ClassWithDictionary { prop = new DictionaryLike(new Dictionary<string, object> { { "test", 42 } }) });
+            _context.Run("JSON.stringify(myObject)").Should().Be("{\"prop\":{\"test\":42}}");
+        }
+
+        [TestMethod]
         public void AccessingDictionaryInManagedObject()
         {
             var dict = new Dictionary<string, object> { { "bar", "33" }, { "baz", true } };
@@ -184,7 +203,17 @@ test.prop.complex = complex;");
 		class ClassWithProperty
         {
             public string MyProperty { get; set; }
-		}
+
+            [DoNotEnumerate]
+            public string MyPropertyInternal { get; set; }
+        }
+
+        [TestMethod]
+        public void ToJSONPrivateProperty()
+        {
+            _context.SetParameter("myObject", new ClassWithProperty { MyProperty = "asdf", MyPropertyInternal = "qwer" });
+            _context.Run("JSON.stringify(myObject)").Should().Be("{\"MyProperty\":\"asdf\"}");
+        }
 
         [TestMethod]
         public void AccessingByNameAPropertyInManagedObject()

@@ -41,6 +41,13 @@
 
 namespace Noesis { namespace Javascript {
 
+    [System::AttributeUsageAttribute(System::AttributeTargets::Property | System::AttributeTargets::Field)]
+    public ref class DoNotEnumerate : public System::Attribute
+    {
+    public:
+        DoNotEnumerate() {}
+    };
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 using namespace std;
@@ -272,7 +279,12 @@ JavascriptInterop::WrapObject(System::Object^ iObject)
 		v8::Isolate *isolate = JavascriptContext::GetCurrentIsolate();
         Handle<ObjectTemplate> instanceTemplate = templ->InstanceTemplate();
 		Handle<Object> object = instanceTemplate->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
-		object->SetInternalField(0, External::New(isolate, context->WrapObject(iObject)));
+        JavascriptExternal *external = context->WrapObject(iObject);
+        object->SetInternalField(0, External::New(isolate, external));
+
+        Handle<Function> toJSON = external->GetMethod(L"ToJSON");
+        if (!toJSON.IsEmpty())
+            object->Set(String::NewFromUtf8(isolate, "toJSON"), toJSON);
 
 		return object;
 	}
@@ -697,6 +709,8 @@ void
 JavascriptInterop::Setter(Local<String> iName, Local<Value> iValue, const PropertyCallbackInfo<Value>& iInfo)
 {
 	wstring name = (wchar_t*) *String::Value(JavascriptContext::GetCurrentIsolate(), iName);
+    if (name == L"toJSON" && iValue->IsFunction())
+        return;
 	Handle<External> external = Handle<External>::Cast(iInfo.Holder()->GetInternalField(0));
 	JavascriptExternal* wrapper = (JavascriptExternal*) external->Value();
 
@@ -725,6 +739,10 @@ void JavascriptInterop::Enumerator(const PropertyCallbackInfo<Array>& iInfo)
 	for (int i = 0; i < members->Length; i++)
 	{
         PropertyInfo^ member = members[i];
+        if (member->GetCustomAttributes(DoNotEnumerate::typeid, false)->Length > 0)
+            continue;
+        if (member->Name == "Item" && member->GetIndexParameters()->Length > 0)
+            continue; // skip indexer properties
         result_names->Set(i, JavascriptInterop::ConvertToV8(member->Name));
 	}
 
