@@ -144,7 +144,17 @@ test.prop.complex = complex;");
 		class ClassWithProperty
         {
             public string MyProperty { get; set; }
-		}
+
+            [DoNotEnumerate]
+            public string MyPropertyInternal { get; set; }
+        }
+
+        [TestMethod]
+        public void ToJSONPrivateProperty()
+        {
+            _context.SetParameter("myObject", new ClassWithProperty { MyProperty = "asdf", MyPropertyInternal = "qwer" });
+            _context.Run("JSON.stringify(myObject)").Should().Be("{\"MyProperty\":\"asdf\"}");
+        }
 
         [TestMethod]
         public void AccessingByNameAPropertyInManagedObject()
