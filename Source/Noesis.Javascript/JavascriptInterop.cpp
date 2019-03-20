@@ -282,18 +282,16 @@ void ToJSONCallback(const v8::FunctionCallbackInfo<Value>& iArgs)
     iArgs.GetReturnValue().Set(JavascriptInterop::ConvertToV8(getJSONMethod->Invoke(self, nullptr)));
 }
 
-Handle<FunctionTemplate> GetToJSONMethodTemplate(System::Object^ object)
+void AddToJSONMethod(Handle<FunctionTemplate> functionTemplate, System::Object^ object)
 {
     auto self = object;
     auto getJSONMethod = self->GetType()->GetMethod("ToJSON");
     if (getJSONMethod == nullptr)
-        return Handle<FunctionTemplate>();
+        return;
 
     auto isolate = JavascriptContext::GetCurrentIsolate();
-    auto context = JavascriptContext::GetCurrent();
-    auto external = External::New(isolate, context->WrapObject(self));
-    auto functionTemplate = FunctionTemplate::New(isolate, ToJSONCallback, external);
-    return functionTemplate;
+    auto toJSONTemplate = FunctionTemplate::New(isolate, ToJSONCallback);
+    functionTemplate->PrototypeTemplate()->Set(String::NewFromUtf8(isolate, "toJSON"), toJSONTemplate);
 }
 
 // TODO: should return Handle<External>
@@ -308,9 +306,7 @@ JavascriptInterop::WrapObject(System::Object^ iObject)
         JavascriptExternal *external = context->WrapObject(iObject);
 
         Handle<FunctionTemplate> templ = context->GetObjectWrapperConstructorTemplate(iObject->GetType());
-        Handle<FunctionTemplate> toJSON = GetToJSONMethodTemplate(iObject);
-        if (!toJSON.IsEmpty())
-            templ->PrototypeTemplate()->Set(String::NewFromUtf8(isolate, "toJSON"), toJSON);
+        AddToJSONMethod(templ, iObject);
         
         Handle<ObjectTemplate> instanceTemplate = templ->InstanceTemplate();
         Handle<Object> object = instanceTemplate->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
