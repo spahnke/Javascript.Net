@@ -104,7 +104,7 @@ namespace Noesis.Javascript.Tests
 				set => internalDict[key] = value;
 			}
 
-            public object ToJSON(object key)
+            public object ToJSON()
             {
                 return internalDict;
             }
@@ -118,6 +118,15 @@ namespace Noesis.Javascript.Tests
         {
             _context.SetParameter("myObject", new ClassWithDictionary { prop = new DictionaryLike(new Dictionary<string, object> { { "test", 42 } }) });
             _context.Run("JSON.stringify(myObject)").Should().Be("{\"prop\":{\"test\":42}}");
+        }
+
+        [TestMethod]
+        public void DictionaryCanBeStringifiedMultipleTimes()
+        {
+            _context.SetParameter("myObject", new ClassWithDictionary { prop = new DictionaryLike(new Dictionary<string, object> { { "test", 42 } }) });
+            _context.SetParameter("myObject2", new ClassWithDictionary { prop = new DictionaryLike(new Dictionary<string, object> { { "test", 23 } }) });
+            _context.Run("JSON.stringify(myObject)").Should().Be("{\"prop\":{\"test\":42}}");
+            _context.Run("JSON.stringify(myObject2)").Should().Be("{\"prop\":{\"test\":23}}");
         }
 
         [TestMethod]
