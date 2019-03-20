@@ -64,11 +64,27 @@ namespace Noesis.Javascript.Tests
             _context.Run("myObject[99] == 'Value 99'").Should().BeOfType<bool>().Which.Should().BeTrue();
         }
 
-        class ClassWithDictionary
+        class ClassWithToJSONMethod
+		{
+			public string Test { get; set; }
+
+            public object ToJSON()
+			{
+				return new int[] { 1, 2, 3, 4 };
+			}
+		}
+
+		[TestMethod]
+		public void ToJSONMethodIsUsedIfAvailable()
+		{
+			_context.SetParameter("myObject", new ClassWithToJSONMethod { Test = "asdf" });
+			_context.Run("JSON.stringify(myObject)").Should().Be("[1,2,3,4]");
+		}
+
+		class ClassWithDictionary
         {
             public DictionaryLike prop { get; set; }
         }
-
 
 		class DictionaryLike
 		{
@@ -95,7 +111,7 @@ namespace Noesis.Javascript.Tests
         }
 
         [TestMethod]
-        public void ToJSONMethodIsUsedIfAvailable()
+        public void DictionaryCanBeStringified()
         {
             _context.SetParameter("myObject", new ClassWithDictionary { prop = new DictionaryLike(new Dictionary<string, object> { { "test", 42 } }) });
             _context.Run("JSON.stringify(myObject)").Should().Be("{\"prop\":{\"test\":42}}");
