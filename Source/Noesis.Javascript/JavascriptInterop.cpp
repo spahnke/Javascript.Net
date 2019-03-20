@@ -282,16 +282,17 @@ JavascriptInterop::WrapObject(System::Object^ iObject)
 
     if (context != nullptr)
     {
-        Handle<FunctionTemplate> templ = context->GetObjectWrapperConstructorTemplate(iObject->GetType());
         v8::Isolate *isolate = JavascriptContext::GetCurrentIsolate();
-        Handle<ObjectTemplate> instanceTemplate = templ->InstanceTemplate();
-        Handle<Object> object = instanceTemplate->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
         JavascriptExternal *external = context->WrapObject(iObject);
-        object->SetInternalField(0, External::New(isolate, external));
 
+        Handle<FunctionTemplate> templ = context->GetObjectWrapperConstructorTemplate(iObject->GetType());
         Handle<FunctionTemplate> toJSON = external->GetMethodTemplate(L"ToJSON");
         if (!toJSON.IsEmpty())
-            templ->Set(String::NewFromUtf8(isolate, "toJSON"), toJSON);
+            templ->PrototypeTemplate()->Set(String::NewFromUtf8(isolate, "toJSON"), toJSON);
+        
+        Handle<ObjectTemplate> instanceTemplate = templ->InstanceTemplate();
+        Handle<Object> object = instanceTemplate->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+        object->SetInternalField(0, External::New(isolate, external));
 
         return object;
     }
