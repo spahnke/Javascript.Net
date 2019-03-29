@@ -73,17 +73,19 @@ public:
 
 	System::Object^ GetObject();
 
-	Handle<Function> GetMethod(wstring iName);
+	Local<Function> GetMethod(wstring iName);
 
-	Handle<Function> GetMethod(Handle<String> iName);
+	Local<Function> GetMethod(Local<String> iName);
 
-	bool GetProperty(wstring iName, Handle<Value> &result);
+	bool GetProperty(wstring iName, Local<Value> &result);
 
-	Handle<Value> GetProperty(uint32_t iIndex);
+	Local<Value> GetProperty(uint32_t iIndex);
 
-	Handle<Value> SetProperty(wstring iName, Handle<Value> iValue);
+	Local<Value> SetProperty(wstring iName, Local<Value> iValue);
 
-	Handle<Value> SetProperty(uint32_t iIndex, Handle<Value> iValue);
+	Local<Value> SetProperty(uint32_t iIndex, Local<Value> iValue);
+
+    Local<Function> GetIterator();
 
 	////////////////////////////////////////////////////////////
 	// Data members
@@ -98,6 +100,10 @@ private:
 
 	// Owned by JavascriptContext.
 	gcroot<System::Collections::Generic::Dictionary<System::String ^, WrappedMethod> ^> mMethods;
+
+    std::unique_ptr<Persistent<Function>> mIterator;
+    static void IteratorCallback(const v8::FunctionCallbackInfo<Value>& iArgs);
+    static void IteratorNextCallback(const v8::FunctionCallbackInfo<Value>& iArgs);
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
