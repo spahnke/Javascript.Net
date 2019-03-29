@@ -277,12 +277,12 @@ JavascriptInterop::ConvertToV8(System::Object^ iObject)
 void ToJSONCallback(const v8::FunctionCallbackInfo<Value>& iArgs)
 {
     auto isolate = iArgs.GetIsolate();
-    auto self = (System::Object^) JavascriptInterop::UnwrapObject(Handle<External>::Cast(iArgs.Holder()->GetInternalField(0)));
+    auto self = (System::Object^) JavascriptInterop::UnwrapObject(Local<External>::Cast(iArgs.Holder()->GetInternalField(0)));
     auto getJSONMethod = self->GetType()->GetMethod("ToJSON");
     iArgs.GetReturnValue().Set(JavascriptInterop::ConvertToV8(getJSONMethod->Invoke(self, nullptr)));
 }
 
-void AddToJSONMethod(Handle<FunctionTemplate> functionTemplate, System::Object^ object)
+void AddToJSONMethod(Local<FunctionTemplate> functionTemplate, System::Object^ object)
 {
     auto self = object;
     auto getJSONMethod = self->GetType()->GetMethod("ToJSON");
@@ -294,8 +294,8 @@ void AddToJSONMethod(Handle<FunctionTemplate> functionTemplate, System::Object^ 
     functionTemplate->PrototypeTemplate()->Set(String::NewFromUtf8(isolate, "toJSON"), toJSONTemplate);
 }
 
-// TODO: should return Handle<External>
-Handle<Object>
+// TODO: should return Local<External>
+Local<Object>
 JavascriptInterop::WrapObject(System::Object^ iObject)
 {
 	JavascriptContext^ context = JavascriptContext::GetCurrent();
@@ -305,11 +305,11 @@ JavascriptInterop::WrapObject(System::Object^ iObject)
         v8::Isolate *isolate = JavascriptContext::GetCurrentIsolate();
         JavascriptExternal *external = context->WrapObject(iObject);
 
-        Handle<FunctionTemplate> templ = context->GetObjectWrapperConstructorTemplate(iObject->GetType());
+        Local<FunctionTemplate> templ = context->GetObjectWrapperConstructorTemplate(iObject->GetType());
         AddToJSONMethod(templ, iObject);
         
-        Handle<ObjectTemplate> instanceTemplate = templ->InstanceTemplate();
-        Handle<Object> object = instanceTemplate->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+        Local<ObjectTemplate> instanceTemplate = templ->InstanceTemplate();
+        Local<Object> object = instanceTemplate->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
         object->SetInternalField(0, External::New(isolate, external));
 
         return object;
@@ -737,7 +737,7 @@ void
 JavascriptInterop::Setter(Local<String> iName, Local<Value> iValue, const PropertyCallbackInfo<Value>& iInfo)
 {
 	wstring name = (wchar_t*) *String::Value(JavascriptContext::GetCurrentIsolate(), iName);
-	Handle<External> external = Handle<External>::Cast(iInfo.Holder()->GetInternalField(0));
+	Local<External> external = Local<External>::Cast(iInfo.Holder()->GetInternalField(0));
 	JavascriptExternal* wrapper = (JavascriptExternal*) external->Value();
 
 	// set property
@@ -755,7 +755,7 @@ System::Reflection::MethodInfo^ GetObjectKeysMethod(System::Object^ self)
 
 void JavascriptInterop::Enumerator(const PropertyCallbackInfo<Array>& iInfo)
 {
-	Handle<External> external = Handle<External>::Cast(iInfo.Holder()->GetInternalField(0));
+	Local<External> external = Local<External>::Cast(iInfo.Holder()->GetInternalField(0));
 
 	JavascriptExternal* wrapper = (JavascriptExternal*)external->Value();
 
