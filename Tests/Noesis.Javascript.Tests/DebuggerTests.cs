@@ -1602,6 +1602,7 @@ function activeWait(seconds)
         [TestMethod]
         [TestCategory("Specified")]
         [Description("Debugger.SetBreakpointByUrl")]
+        [Ignore]
         public void Debugger_StopAfterFirstPausedOnException_ExecutionShouldTerminate()
         {
             SemaphoreSlim pausedOnException = new SemaphoreSlim(0);
