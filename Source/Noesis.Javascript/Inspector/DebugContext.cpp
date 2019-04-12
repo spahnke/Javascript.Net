@@ -48,7 +48,11 @@ namespace Noesis
                     this->debuggerState = DebuggerState::Stopped;
 
                 // disconnect (destroy context?) (implicite disable debugger)
+                JavascriptScope javascriptScope(this->javascriptContext);
+
                 this->inspectorClient->DisconnectFrontend();
+                delete this->inspectorClient;
+                this->inspectorClient = nullptr;
             }
 
             /*
