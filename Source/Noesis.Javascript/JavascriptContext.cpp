@@ -98,6 +98,8 @@ namespace Noesis { namespace Javascript {
 	}
 
     std::atomic_flag initalized = ATOMIC_FLAG_INIT;
+    v8::Platform *platform;
+
 	// This code didn't work in managed code, probably due to too-clever smart pointers.
     v8::Platform* UnmanagedInitialisation()
 	{
@@ -107,12 +109,11 @@ namespace Noesis { namespace Javascript {
             GetPathsForInitialisation(dll_path, natives_blob_bin_path, snapshot_blob_bin_path, icudtl_dat_path);
             v8::V8::InitializeICUDefaultLocation(dll_path, icudtl_dat_path);
             v8::V8::InitializeExternalStartupData(natives_blob_bin_path, snapshot_blob_bin_path);
-            v8::Platform *platform = v8::platform::NewDefaultPlatform().release();
+            platform = v8::platform::NewDefaultPlatform().release();
             v8::V8::InitializePlatform(platform);
             v8::V8::Initialize();
-            return platform;
         }
-        return nullptr;
+        return platform;
 	}
 #pragma managed(pop)
 
@@ -129,9 +130,7 @@ static JavascriptContext::JavascriptContext()
 {
     System::Threading::Mutex mutex(true, "FA12B681-E968-4D3A-833D-43B25865BEF1");
     v8::Platform *platform = UnmanagedInitialisation();
-    if (platform != nullptr) {
-        JavascriptContext::currentPlatform = platform;
-    }
+    JavascriptContext::currentPlatform = platform;
 }
 
 
