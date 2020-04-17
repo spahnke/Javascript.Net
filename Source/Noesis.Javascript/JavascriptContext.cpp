@@ -98,8 +98,10 @@ namespace Noesis { namespace Javascript {
 	}
 
     std::atomic_flag initalized = ATOMIC_FLAG_INIT;
+    v8::Platform *platform;
+
 	// This code didn't work in managed code, probably due to too-clever smart pointers.
-	void UnmanagedInitialisation()
+    v8::Platform* UnmanagedInitialisation()
 	{
         if (!initalized.test_and_set(std::memory_order_acquire)) {
             // Get location of DLL so that v8 can use it to find its .bin files.
@@ -107,10 +109,11 @@ namespace Noesis { namespace Javascript {
             GetPathsForInitialisation(dll_path, natives_blob_bin_path, snapshot_blob_bin_path, icudtl_dat_path);
             v8::V8::InitializeICUDefaultLocation(dll_path, icudtl_dat_path);
             v8::V8::InitializeExternalStartupData(natives_blob_bin_path, snapshot_blob_bin_path);
-            v8::Platform *platform = v8::platform::NewDefaultPlatform().release();
+            platform = v8::platform::NewDefaultPlatform().release();
             v8::V8::InitializePlatform(platform);
             v8::V8::Initialize();
         }
+        return platform;
 	}
 #pragma managed(pop)
 
@@ -126,7 +129,8 @@ v8::Local<v8::String> ToV8String(Isolate* isolate, System::String^ value) {
 static JavascriptContext::JavascriptContext()
 {
     System::Threading::Mutex mutex(true, "FA12B681-E968-4D3A-833D-43B25865BEF1");
-    UnmanagedInitialisation();
+    v8::Platform *platform = UnmanagedInitialisation();
+    JavascriptContext::currentPlatform = platform;
 }
 
 
@@ -153,6 +157,11 @@ void JavascriptContext::FatalErrorCallbackMember(const char* location, const cha
 		System::Console::WriteLine(location_str);
 		System::Console::WriteLine(message_str);
 	}
+}
+
+v8::Platform* JavascriptContext::GetCurentPlatform()
+{
+    return currentPlatform;
 }
 
 JavascriptContext::JavascriptContext()
@@ -461,6 +470,13 @@ JavascriptContext::GetCurrentIsolate()
 Local<v8::Object> JavascriptContext::GetGlobal()
 {
 	return mContext->Get(this->GetCurrentIsolate())->Global();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+Persistent<Context>* JavascriptContext::GetV8Context()
+{
+    return mContext;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -188,6 +188,8 @@ internal:
 
 	Local<v8::Object> GetGlobal();
 
+    Persistent<Context>* GetV8Context();
+
     v8::Locker *Enter([System::Runtime::InteropServices::Out] JavascriptContext^% old_context);
 
 	void Exit(v8::Locker *locker, JavascriptContext^ old_context);
@@ -200,6 +202,9 @@ internal:
 
 	static void FatalErrorCallbackMember(const char* location, const char* message);
 
+    static v8::Platform* GetCurentPlatform();
+
+    
 	////////////////////////////////////////////////////////////
 	// Data members
 	////////////////////////////////////////////////////////////
@@ -235,6 +240,8 @@ protected:
 	[System::ThreadStaticAttribute] static JavascriptContext ^sCurrentContext;
 
 	static FatalErrorHandler^ fatalErrorHandler;
+
+    static v8::Platform *currentPlatform;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

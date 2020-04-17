@@ -159,6 +159,12 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Inspector\MessageChannel.h" />
+    <ClInclude Include="Inspector\DebugContext.h" />
+    <ClInclude Include="Inspector\DispatchMessageTask.h" />
+    <ClInclude Include="Inspector\InspectorClient.h" />
+    <ClInclude Include="Inspector\BackChannelDelegate.h" />
+    <ClInclude Include="Inspector\StringViewConversion.h" />
     <ClInclude Include="JavascriptContext.h" />
     <ClInclude Include="JavascriptException.h" />
     <ClInclude Include="JavascriptExternal.h" />
@@ -169,6 +175,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AssemblyInfo.cpp" />
+    <ClCompile Include="Inspector\MessageChannel.cpp" />
+    <ClCompile Include="Inspector\DebugContext.cpp" />
+    <ClCompile Include="Inspector\InspectorClient.cpp" />
+    <ClCompile Include="Inspector\DispatchMessageTask.cpp" />
+    <ClCompile Include="Inspector\BackChannelDelegate.cpp" />
+    <ClCompile Include="Inspector\StringViewConversion.cpp" />
     <ClCompile Include="JavascriptContext.cpp" />
     <ClCompile Include="JavascriptException.cpp" />
     <ClCompile Include="JavascriptExternal.cpp" />
