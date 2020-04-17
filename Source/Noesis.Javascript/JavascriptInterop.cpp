@@ -41,11 +41,26 @@
 
 namespace Noesis { namespace Javascript {
 
+    [System::AttributeUsageAttribute(System::AttributeTargets::Property | System::AttributeTargets::Field)]
+    public ref class DoNotEnumerate : public System::Attribute
+    {
+    public:
+        DoNotEnumerate() {}
+    };
+
+    [System::AttributeUsageAttribute(System::AttributeTargets::Method)]
+    public ref class ObjectKeys : public System::Attribute
+    {
+    public:
+        ObjectKeys() {}
+    };
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 using namespace std;
 using namespace System::Collections;
 using namespace System::Collections::Generic;
+using namespace System::Reflection;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -53,7 +68,7 @@ void JavascriptInterop::InitObjectWrapperTemplate(Local<ObjectTemplate> &object)
 {
     object->SetInternalFieldCount(1);
 
-    NamedPropertyHandlerConfiguration namedPropertyConfig((GenericNamedPropertyGetterCallback) Getter, (GenericNamedPropertySetterCallback) Setter, nullptr, nullptr, nullptr);
+    NamedPropertyHandlerConfiguration namedPropertyConfig((GenericNamedPropertyGetterCallback) Getter, (GenericNamedPropertySetterCallback) Setter, nullptr, nullptr, (GenericNamedPropertyEnumeratorCallback) Enumerator);
     object->SetHandler(namedPropertyConfig);
 
     IndexedPropertyHandlerConfiguration indexedPropertyConfig((IndexedPropertyGetterCallback) IndexGetter, (IndexedPropertySetterCallback) IndexSetter);
@@ -282,22 +297,46 @@ JavascriptInterop::ConvertToV8(System::Object^ iObject)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void ToJSONCallback(const v8::FunctionCallbackInfo<Value>& iArgs)
+{
+    auto isolate = iArgs.GetIsolate();
+    auto self = (System::Object^) JavascriptInterop::UnwrapObject(Local<External>::Cast(iArgs.Holder()->GetInternalField(0)));
+    auto getJSONMethod = self->GetType()->GetMethod("ToJSON");
+    iArgs.GetReturnValue().Set(JavascriptInterop::ConvertToV8(getJSONMethod->Invoke(self, nullptr)));
+}
+
+void AddToJSONMethod(Local<FunctionTemplate> functionTemplate, System::Object^ object)
+{
+    auto self = object;
+    auto getJSONMethod = self->GetType()->GetMethod("ToJSON");
+    if (getJSONMethod == nullptr)
+        return;
+
+    auto isolate = JavascriptContext::GetCurrentIsolate();
+    auto toJSONTemplate = FunctionTemplate::New(isolate, ToJSONCallback);
+    functionTemplate->PrototypeTemplate()->Set(String::NewFromUtf8(isolate, "toJSON"), toJSONTemplate);
+}
+
 // TODO: should return Local<External>
 Local<Object>
 JavascriptInterop::WrapObject(System::Object^ iObject)
 {
 	JavascriptContext^ context = JavascriptContext::GetCurrent();
 
-	if (context != nullptr)
-	{
-		Local<FunctionTemplate> templ = context->GetObjectWrapperConstructorTemplate(iObject->GetType());
-		v8::Isolate *isolate = JavascriptContext::GetCurrentIsolate();
-        Local<ObjectTemplate> instanceTemplate = templ->InstanceTemplate();
-		Local<Object> object = instanceTemplate->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
-		object->SetInternalField(0, External::New(isolate, context->WrapObject(iObject)));
+    if (context != nullptr)
+    {
+        v8::Isolate *isolate = JavascriptContext::GetCurrentIsolate();
+        JavascriptExternal *external = context->WrapObject(iObject);
 
-		return object;
-	}
+        Local<FunctionTemplate> templ = context->GetObjectWrapperConstructorTemplate(iObject->GetType());
+        AddToJSONMethod(templ, iObject);
+        
+        Local<ObjectTemplate> instanceTemplate = templ->InstanceTemplate();
+        Local<Object> object = instanceTemplate->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+        object->SetInternalField(0, External::New(isolate, external));
+
+        return object;
+    }
 
 	throw gcnew System::Exception("No context currently active.");
 }
@@ -729,7 +768,56 @@ JavascriptInterop::Setter(Local<String> iName, Local<Value> iValue, const Proper
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+System::Reflection::MethodInfo^ GetObjectKeysMethod(System::Object^ self)
+{
+    for each (auto method in self->GetType()->GetMethods())
+        if (method->GetCustomAttributes(ObjectKeys::typeid, false)->Length > 0)
+            return method;
+    return nullptr;
+}
 
+void JavascriptInterop::Enumerator(const PropertyCallbackInfo<Array>& iInfo)
+{
+	Local<External> external = Local<External>::Cast(iInfo.Holder()->GetInternalField(0));
+
+	JavascriptExternal* wrapper = (JavascriptExternal*)external->Value();
+
+	System::Object^ self = wrapper->GetObject();
+	System::Type^ type = self->GetType();
+	
+	v8::Isolate* isolate = v8::Isolate::GetCurrent();
+	EscapableHandleScope handle_scope(isolate);
+
+    auto getObjectKeysMethod = GetObjectKeysMethod(self);
+    if (getObjectKeysMethod != nullptr)
+    {
+        auto keys = safe_cast<cli::array<System::String^>^>(getObjectKeysMethod->Invoke(self, nullptr));
+        auto result_names = Array::New(isolate, keys->Length);
+
+        for (int i = 0; i < keys->Length; i++)
+            result_names->Set(i, JavascriptInterop::ConvertToV8(keys[i]));
+
+        iInfo.GetReturnValue().Set<Array>(handle_scope.Escape(result_names));
+        return;
+    }
+
+	cli::array<PropertyInfo^>^ members = type->GetProperties(System::Reflection::BindingFlags::Public | System::Reflection::BindingFlags::Instance);
+    Local<Array> result_names = Array::New(isolate, members->Length);
+	
+	for (int i = 0; i < members->Length; i++)
+	{
+        PropertyInfo^ member = members[i];
+        if (member->GetCustomAttributes(DoNotEnumerate::typeid, false)->Length > 0)
+            continue;
+        if (member->Name == "Item" && member->GetIndexParameters()->Length > 0)
+            continue; // skip indexer properties
+        result_names->Set(i, JavascriptInterop::ConvertToV8(member->Name));
+	}
+
+	iInfo.GetReturnValue().Set<Array>(handle_scope.Escape(result_names));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 void
 JavascriptInterop::IndexGetter(uint32_t iIndex, const PropertyCallbackInfo<Value> &iInfo)
 {

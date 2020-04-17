@@ -2,7 +2,7 @@
 using FluentAssertions;
 using System;
 using System.Collections.Generic;
-using System.Collections;
+using System.Linq;
 
 namespace Noesis.Javascript.Tests
 {
@@ -48,6 +48,13 @@ namespace Noesis.Javascript.Tests
         }
 
         [TestMethod]
+        public void ClassWithIndexer_IndexerIsIgnoredDuringEnumeration()
+        {
+            _context.SetParameter("myObject", new ClassWithIndexer { Index = 1, Value = "asdf" });
+            _context.Run("JSON.stringify(myObject)").Should().Be("{\"Index\":1,\"Value\":\"asdf\"}");
+        }
+
+        [TestMethod]
         public void AccessingByIndexAPropertyInAManagedObject()
         {
             _context.SetParameter("myObject", new ClassWithIndexer { Value = "Value"});
@@ -55,11 +62,27 @@ namespace Noesis.Javascript.Tests
             _context.Run("myObject[99] == 'Value 99'").Should().BeOfType<bool>().Which.Should().BeTrue();
         }
 
-        class ClassWithDictionary
+        class ClassWithToJSONMethod
+		{
+			public string Test { get; set; }
+
+            public object ToJSON()
+			{
+				return new int[] { 1, 2, 3, 4 };
+			}
+		}
+
+		[TestMethod]
+		public void ToJSONMethodIsUsedIfAvailable()
+		{
+			_context.SetParameter("myObject", new ClassWithToJSONMethod { Test = "asdf" });
+			_context.Run("JSON.stringify(myObject)").Should().Be("[1,2,3,4]");
+		}
+
+		class ClassWithDictionary
         {
             public DictionaryLike prop { get; set; }
         }
-
 
 		class DictionaryLike
 		{
@@ -78,9 +101,53 @@ namespace Noesis.Javascript.Tests
 				get => internalDict[key];
 				set => internalDict[key] = value;
 			}
-		}
 
-		[TestMethod]
+            public object ToJSON()
+            {
+                return internalDict;
+            }
+
+            [ObjectKeys]
+            public string[] GetKeys() => internalDict.Keys.ToArray();
+        }
+
+        [TestMethod]
+        public void DictionaryCanBeStringified()
+        {
+            _context.SetParameter("myObject", new ClassWithDictionary { prop = new DictionaryLike(new Dictionary<string, object> { { "test", 42 } }) });
+            _context.Run("JSON.stringify(myObject)").Should().Be("{\"prop\":{\"test\":42}}");
+        }
+
+        [TestMethod]
+        public void DictionaryCanBeStringifiedMultipleTimes()
+        {
+            _context.SetParameter("myObject", new ClassWithDictionary { prop = new DictionaryLike(new Dictionary<string, object> { { "test", 42 } }) });
+            _context.SetParameter("myObject2", new ClassWithDictionary { prop = new DictionaryLike(new Dictionary<string, object> { { "test", 23 } }) });
+            _context.Run("JSON.stringify(myObject)").Should().Be("{\"prop\":{\"test\":42}}");
+            _context.Run("JSON.stringify(myObject2)").Should().Be("{\"prop\":{\"test\":23}}");
+        }
+
+        [TestMethod]
+        public void ObjectKeys()
+        {
+            var iObject = new ClassWithDictionary { prop = new DictionaryLike(new Dictionary<string, object> { { "test", 42 } }) };
+            _context.SetParameter("myObject", iObject);
+            var result = _context.Run("Object.keys(myObject.prop)");
+            result.Should().BeOfType<object[]>().Which.Should().HaveCount(1);
+            ((object[]) result)[0].Should().Be("test");
+        }
+
+        [TestMethod]
+        public void ObjectGetOwnPropertyNames()
+        {
+            var iObject = new ClassWithDictionary { prop = new DictionaryLike(new Dictionary<string, object> { { "test", 42 } }) };
+            _context.SetParameter("myObject", iObject);
+            var result = _context.Run("Object.getOwnPropertyNames(myObject.prop)");
+            result.Should().BeOfType<object[]>().Which.Should().HaveCount(1);
+            ((object[]) result)[0].Should().Be("test");
+        }
+
+        [TestMethod]
         public void AccessingDictionaryInManagedObject()
         {
             var dict = new Dictionary<string, object> { { "bar", "33" }, { "baz", true } };
@@ -180,9 +247,19 @@ test.prop.complex = complex;");
 			testObj.internalDict["foo"].Should().Be("bar");
 		}
 
-		class ClassWithProperty
+        class ClassWithProperty
         {
             public string MyProperty { get; set; }
+
+            [DoNotEnumerate]
+            public string MyPropertyInternal { get; set; }
+        }
+
+        [TestMethod]
+        public void ToJSONPrivateProperty()
+        {
+            _context.SetParameter("myObject", new ClassWithProperty { MyProperty = "asdf", MyPropertyInternal = "qwer" });
+            _context.Run("JSON.stringify(myObject)").Should().Be("{\"MyProperty\":\"asdf\"}");
         }
 
         [TestMethod]
@@ -193,7 +270,141 @@ test.prop.complex = complex;");
             _context.Run("myObject.MyProperty == 'This is the string return by \"MyProperty\"'").Should().BeOfType<bool>().Which.Should().BeTrue();
         }
 
-        class ClassWithDecimalProperty
+		[TestMethod]
+		public void ObjectKeys_NoPropertyEnum_EmptyArray()
+		{
+			_context.SetParameter("obj", new { });
+
+			var result = _context.Run("Object.keys(obj);");
+			result.Should().BeOfType<object[]>().Which.Should().HaveCount(0);
+		}
+
+		[TestMethod]
+		public void ObjectKeys_SinglePropertyEnum_OnePropertyName()
+		{
+			_context.SetParameter("myObject", new ClassWithProperty { MyProperty = "" });
+
+			var result = _context.Run("Object.keys(myObject);");
+			result.Should().BeOfType<object[]>().Which.Should().HaveCount(1);
+			((object[]) result)[0].Should().Be("MyProperty");
+		}
+
+
+		[TestMethod]
+		public void ObjectKeys_MDN_StringObj_ThreePropertyNames()
+		{
+			//> Object.keys("foo") => TypeError: "foo" is not an object		// ES5 code
+			//> Object.keys("foo") => ["0", "1", "2"]						// ES2015 code
+			_context.SetParameter("obj", "foo");
+
+			var result = _context.Run("Object.keys(obj);");
+			
+			result.Should().BeOfType<object[]>().Which.Should().HaveCount(3);
+			((object[])result)[0].Should().Be("0");
+			((object[])result)[1].Should().Be("1");
+			((object[])result)[2].Should().Be("2");
+		}
+
+		[TestMethod]
+		public void ObjectKeys_MDN_ArrayThreePropertiesEnum_ThreePropertyNames()
+		{
+			//var arr = ['a', 'b', 'c'];
+			//console.log(Object.keys(arr)); // console: ['0', '1', '2']
+			_context.SetParameter("arr", new string[]{ "a","b","c" });
+			
+			var result = _context.Run("Object.keys(arr);");
+			result.Should().BeOfType<object[]>().Which.Should().HaveCount(3);
+			((object[])result)[0].Should().Be("0");
+			((object[])result)[1].Should().Be("1");
+			((object[])result)[2].Should().Be("2");
+		}
+		
+		class ClassWithFunctionProperty
+		{
+			public void TestFunc() { }
+		}
+
+		[TestMethod]
+		public void ObjectKeys_FunctionAsProperty_EmptyArray()
+		{
+			_context.SetParameter("myObject", new ClassWithFunctionProperty() );
+
+			var result = _context.Run("Object.keys(myObject);");
+			result.Should().BeOfType<object[]>().Which.Should().HaveCount(0);
+		}
+		
+		[TestMethod]
+		public void ObjectKeys_FunctionAsParam_EmptyArray()
+		{
+			Func<double> fooFunc = () => 42;
+			_context.SetParameter("myObject", fooFunc);
+
+			var result = _context.Run("Object.keys(myObject);");
+			result.Should().BeOfType<object[]>().Which.Should().HaveCount(0);
+		}
+		
+		[TestMethod]
+		public void ForInLoop_ObjectWithoutProperties_EmptyArray()
+		{
+			_context.SetParameter("myObject", new {  });
+
+			var result = _context.Run(@"var result = [];
+for(var prop in myObject) {
+result.push(prop);
+}
+result;");
+			result.Should().BeOfType<object[]>().Which.Should().HaveCount(0);
+		}
+
+		[TestMethod]
+		public void ForInLoop_ObjectProperties_OnePropertyName()
+		{
+			_context.SetParameter("myObject", new ClassWithProperty() { });
+
+			var result = _context.Run(@"var result = [];
+for(var prop in myObject) {
+result.push(prop);
+}
+result;");
+			result.Should().BeOfType<object[]>().Which.Should().HaveCount(1);
+			((object[])result)[0].Should().Be("MyProperty");
+		}
+
+		abstract class ClassAsSuperClass
+		{
+			public string MySuperClassProperty { get; set; }
+		}
+
+		class ClassAsSubClass : ClassAsSuperClass
+		{
+			public string MySubClassProperty { get; set; }
+		}
+
+		[TestMethod]
+		public void ObjectKeys_OnlyOwnPropertiesInInheritance_OneName()
+		{
+			_context.SetParameter("myObject", new ClassAsSubClass());
+	
+			var result = _context.Run("Object.keys(myObject);");
+			result.Should().BeOfType<object[]>().Which.Should().HaveCount(2);
+			((object[])result)[0].Should().Be("MySubClassProperty");
+		}
+
+
+		[TestMethod]
+		public void ForInLoop_ObjectInheritanceProperties_OnlySubClassPropertyName()
+		{
+			_context.SetParameter("myObject", new { MyProperty = "" });
+
+			var result = _context.Run(@"var result = [];
+//for(var prop in myObject) {
+//result.push(prop);
+//}
+//result;");
+		}
+
+
+		class ClassWithDecimalProperty
         {
             public decimal D { get; set; }
         }
