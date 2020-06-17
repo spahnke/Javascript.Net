@@ -243,7 +243,7 @@ namespace Noesis.Javascript.Tests
         [TestMethod]
         public void SendInvalidProtocolMessage_WithoutDebugger_ThrowsException()
         {
-            const string INVALID_JSON_MESSAGE = "{\"error\":{\"code\":-32700,\"message\":\"Message must be a valid JSON\"}}";
+            const string INVALID_JSON_MESSAGE = "{\"error\":{\"code\":-32700,\"message\":\"JSON: invalid token at position 0\"}}";
             var result = debugContext.SendProtocolMessage("foo");
             Assert.AreEqual(INVALID_JSON_MESSAGE, result);
         }
@@ -447,7 +447,8 @@ function activeWait(seconds)
                     sourceMapURL = "",
                     hasSourceURL = false,
                     isModule = false,
-                    length = 13
+                    length = 13,
+                    scriptLanguage = "JavaScript",
                 }
             });
 
@@ -505,7 +506,8 @@ function activeWait(seconds)
                     sourceMapURL = "",
                     hasSourceURL = false,
                     isModule = false,
-                    length = 20
+                    length = 20,
+                    scriptLanguage = "JavaScript",
                 }
             });
 

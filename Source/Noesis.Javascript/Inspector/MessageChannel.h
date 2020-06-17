@@ -25,7 +25,7 @@ namespace Noesis
                 void flushProtocolNotifications() override;
                 gcroot<BackChannelDelegate^> backChannelDelegate;
                 std::unique_ptr<v8_inspector::V8InspectorSession> session;
-                const gcroot<System::String^> INVALID_JSON_MESSAGE = "{\"error\":{\"code\":-32700,\"message\":\"Message must be a valid JSON\"}}";
+                const gcroot<System::String^> INVALID_JSON_MESSAGE = "{\"error\":{\"code\":-32700,\"message\":\"JSON";
             };
         }
     }
