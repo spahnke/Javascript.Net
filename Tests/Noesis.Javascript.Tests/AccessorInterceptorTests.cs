@@ -3,6 +3,7 @@ using FluentAssertions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace Noesis.Javascript.Tests
 {
@@ -106,6 +107,67 @@ namespace Noesis.Javascript.Tests
 
             [ObjectKeys]
             public string[] GetKeys() => internalDict.Keys.ToArray();
+        }
+
+        enum PersonType
+        {
+            A,
+            B
+        }
+
+        class Person
+        {
+            // in order of conversion methods in JavascriptInterop::ConvertToV8
+            // except for the DateTime property, because it is more likely to get a crash if it is at the end
+            
+            //public System.Numerics.BigInteger BigInt { get; set; } // can't be serialized
+            public PersonType PersonType { get; set; }
+            public char Char { get; set; }
+            public string Name { get; set; }
+            public Regex Regex { get; set; }
+            public Func<int> Callback { get; set; }
+            public Dictionary<string, object> Dict { get; set; }
+            public List<string> List { get; set; }
+            public Exception Exception { get; set; }
+            public DateTime Birthdate { get; set; }
+            public Address Address { get; set; }
+        }
+
+        class Address
+        {
+            public string City { get; set; }
+            public Person Person { get; set; }
+        }
+
+        [TestMethod]
+        public void StringifyOfRecursiveObject_ShouldThrowAndNotCrash()
+        {
+            // When calling JSON.stringify on a recursive data structure that contains a DateTime object we experienced a crash 
+            // because of the call to ToLocalChecked in the return statement of JavascriptInterop::ConvertDateTimeToV8. This test
+            // case simulates that for any type that has a call to ToLocalChecked that can be reached from JavascriptInterop::ConvertToV8.
+            // The crash happened because ToLocalChecked sends us to FatalErrorCallback (JavascriptContext.cpp) which then terminates the process.
+            // However, there is already an exception pending when we reach that ToLocalChecked call because the maximum call stack size
+            // has been exceeded while stringifying. This is the actual reason why we get an empty MaybeLocal in the first place which
+            // then leads to the crash. Interestingly, this *only* seems to happen for the case of the DateTime conversion.
+            var address = new Address { City = "asdf" };
+            var person = new Person
+            {
+                PersonType = PersonType.A,
+                Char = 'a',
+                Birthdate = DateTime.Today,
+                Name = "test",
+                Regex = new Regex("asdf", RegexOptions.ECMAScript),
+                Callback = () => 42,
+                Dict = new Dictionary<string, object> { { "a", 42 } },
+                List = new List<string> { "qwer" },
+                Exception = new Exception("foo"),
+                Address = address
+            };
+            address.Person = person;
+            _context.SetParameter("person", person);
+            //Assert.AreEqual("", _context.Run("JSON.stringify(person)")); // comment Address in Person and uncomment this to check the general shape of the JSON
+            Action action = () => _context.Run("JSON.stringify(person)");
+            action.ShouldThrowExactly<JavascriptException>().Which.Message.Should().Be("RangeError: Maximum call stack size exceeded");
         }
 
         [TestMethod]

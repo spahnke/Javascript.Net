@@ -463,7 +463,7 @@ System::DateTime^ JavascriptInterop::ConvertDateFromV8(Local<Date> date)
     return gcnew System::DateTime(year, month, day, hour, minute, second, millisecond, System::DateTimeKind::Local);
 }
 
-Local<Date> JavascriptInterop::ConvertDateTimeToV8(System::DateTime^ dateTime)
+Local<Value> JavascriptInterop::ConvertDateTimeToV8(System::DateTime^ dateTime)
 {
     auto isolate = JavascriptContext::GetCurrentIsolate();
     EscapableHandleScope handleScope(isolate);
@@ -483,7 +483,10 @@ Local<Date> JavascriptInterop::ConvertDateTimeToV8(System::DateTime^ dateTime)
     auto dateConstructor = Local<Function>::Cast(globalObj->Get(String::NewFromUtf8(isolate, "Date")));
     Local<Value> parameters[] = { year, month, day, hour, minute, second, millisecond };
 
-    return handleScope.Escape(dateConstructor->NewInstance(isolate->GetCurrentContext(), 7, parameters).ToLocalChecked().As<Date>());
+    auto maybeDate = dateConstructor->NewInstance(isolate->GetCurrentContext(), 7, parameters);
+    if (maybeDate.IsEmpty())
+        return Null(isolate); // it should be fine to return null here since the empty MaybeLocal indicates a pending exception that is surfaced anyway
+    return handleScope.Escape(maybeDate.ToLocalChecked());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -92,7 +92,7 @@ private:
 
 	static System::DateTime^ ConvertDateFromV8(Local<Date> iValue);
 
-    static Local<Date> ConvertDateTimeToV8(System::DateTime^ dateTime);
+    static Local<Value> ConvertDateTimeToV8(System::DateTime^ dateTime);
 
     static System::Text::RegularExpressions::Regex^ ConvertRegexFromV8(Local<Value> iValue);
 

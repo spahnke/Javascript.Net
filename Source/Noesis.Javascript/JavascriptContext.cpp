@@ -150,6 +150,8 @@ void JavascriptContext::FatalErrorCallbackMember(const char* location, const cha
 	if (fatalErrorHandler != nullptr) {
 		fatalErrorHandler(location_str, message_str);
 	} else {
+        System::Diagnostics::Trace::WriteLine(location_str, "Fatal Error");
+        System::Diagnostics::Trace::WriteLine(message_str, "Fatal Error");
 		System::Console::WriteLine(location_str);
 		System::Console::WriteLine(message_str);
 	}
