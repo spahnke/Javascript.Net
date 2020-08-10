@@ -140,8 +140,15 @@ JavascriptInterop::ConvertFromV8(Local<Value> iValue, ConvertedObjects &already_
 		return gcnew System::Int32(iValue->Int32Value(JavascriptContext::GetCurrentIsolate()->GetCurrentContext()).ToChecked());
 	if (iValue->IsNumber())
 		return gcnew System::Double(iValue->NumberValue(JavascriptContext::GetCurrentIsolate()->GetCurrentContext()).ToChecked());
-	if (iValue->IsString())
-		return gcnew System::String((wchar_t*)*String::Value(JavascriptContext::GetCurrentIsolate(), iValue->ToString(JavascriptContext::GetCurrentIsolate())));
+    if (iValue->IsString())
+    {
+        auto stringValue = iValue->ToString(JavascriptContext::GetCurrentIsolate());
+        auto length = stringValue->Length();
+        String::Value utf16Bytes(JavascriptContext::GetCurrentIsolate(), stringValue);
+        
+        // Using a constructor which takes a length makes sure that we don't discard zero bytes in the middle of the string
+        return gcnew System::String((wchar_t*)* utf16Bytes, 0, length);
+    }
 	if (iValue->IsArray())
 		return ConvertArrayFromV8(iValue, already_converted);
 	if (iValue->IsDate())
@@ -150,6 +157,11 @@ JavascriptInterop::ConvertFromV8(Local<Value> iValue, ConvertedObjects &already_
         return ConvertRegexFromV8(iValue);
 	if (iValue->IsFunction())
 		return gcnew JavascriptFunction(iValue->ToObject(JavascriptContext::GetCurrentIsolate()), JavascriptContext::GetCurrent());
+    if (iValue->IsBigInt())
+    {
+        auto stringRepresentation = iValue->ToString(JavascriptContext::GetCurrentIsolate()->GetCurrentContext()).ToLocalChecked();
+        return System::Numerics::BigInteger::Parse(safe_cast<System::String^>(JavascriptInterop::ConvertFromV8(stringRepresentation, already_converted)));
+    }
 	if (iValue->IsObject())
 	{
 		Local<Object> object = iValue->ToObject(JavascriptContext::GetCurrentIsolate());
@@ -182,6 +194,13 @@ JavascriptInterop::ConvertToV8(System::Object^ iObject)
 				return v8::Number::New(isolate, safe_cast<double>(iObject));
 			if (type == System::Boolean::typeid)
 				return v8::Boolean::New(isolate, safe_cast<bool>(iObject));
+            if (type == System::Numerics::BigInteger::typeid)
+            {
+                auto globalObj = isolate->GetCurrentContext()->Global();
+                auto bigIntFunction = Local<Function>::Cast(globalObj->Get(String::NewFromUtf8(isolate, "BigInt")));
+                Local<Value> parameters[] = { ConvertToV8(safe_cast<System::Numerics::BigInteger>(iObject).ToString()) };
+                return bigIntFunction->Call(isolate->GetCurrentContext(), globalObj, 1, parameters).ToLocalChecked();
+            }
 			if (type->IsEnum)
 			{
 				// No equivalent to enum, so convert to a string.
@@ -220,9 +239,13 @@ JavascriptInterop::ConvertToV8(System::Object^ iObject)
 		}
 		if (type == System::String::typeid)
 		{
-			pin_ptr<const wchar_t> valuePtr = PtrToStringChars(safe_cast<System::String^>(iObject));
+            auto stringValue = safe_cast<System::String^>(iObject);
+            auto length = stringValue->Length;
+			pin_ptr<const wchar_t> valuePtr = PtrToStringChars(stringValue);
 			wchar_t* value = (wchar_t*) valuePtr;
-			return v8::String::NewFromTwoByte(isolate, (uint16_t*)value, v8::NewStringType::kNormal).ToLocalChecked();
+
+            // Using a constructor which takes a length makes sure that we don't discard zero bytes in the middle of the string
+			return v8::String::NewFromTwoByte(isolate, (uint16_t*)value, v8::NewStringType::kNormal, length).ToLocalChecked();
 		}
 		if (type->IsArray)
 			return ConvertFromSystemArray(safe_cast<System::Array^>(iObject));
