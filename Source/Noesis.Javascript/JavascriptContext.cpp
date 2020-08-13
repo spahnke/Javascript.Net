@@ -96,7 +96,6 @@ namespace Noesis { namespace Javascript {
             char dll_path[MAX_PATH], icudtl_dat_path[MAX_PATH];
             GetPathsForInitialisation(dll_path, icudtl_dat_path);
             v8::V8::InitializeICUDefaultLocation(dll_path, icudtl_dat_path);
-            v8::V8::InitializeExternalStartupData(natives_blob_bin_path, snapshot_blob_bin_path);
             platform = v8::platform::NewDefaultPlatform().release();
             v8::V8::InitializePlatform(platform);
             v8::V8::Initialize();

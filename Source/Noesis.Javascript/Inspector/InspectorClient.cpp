@@ -8,6 +8,8 @@
 #include "v8-inspector.h"
 #include "..\JavascriptInterop.h"
 
+#include <memory>
+
 namespace Noesis
 {
     namespace Javascript
@@ -41,8 +43,8 @@ namespace Noesis
                 this->messageLoopTermination = true;
                 this->isolate.TerminateExecution();
                 this->quitMessageLoopOnPause();
-                DispatchMessageTask *task = new DispatchMessageTask(this->GetChannel(), true);
-                this->CallTaskOnCurrentExecutionTask(*task);
+                std::unique_ptr<DispatchMessageTask> task(new DispatchMessageTask(this->GetChannel(), true));
+                this->CallTaskOnCurrentExecutionTask(std::move(task));
             }
 
             MessageChannel& InspectorClient::GetChannel()
@@ -85,12 +87,13 @@ namespace Noesis
             void InspectorClient::DispatchMessageFromFrontend(System::String^ message)
             {
                 // this resource is released internally by V8
-                DispatchMessageTask *task = new DispatchMessageTask(this->GetChannel(), message);
-                this->CallTaskOnCurrentExecutionTask(*task);
+                std::unique_ptr<DispatchMessageTask> task(new DispatchMessageTask(this->GetChannel(), message));
+                this->CallTaskOnCurrentExecutionTask(std::move(task));
             }
 
-            void InspectorClient::CallTaskOnCurrentExecutionTask(DispatchMessageTask& task) {
-                this->platform.CallOnForegroundThread(&isolate, &task);
+            void InspectorClient::CallTaskOnCurrentExecutionTask(std::unique_ptr<DispatchMessageTask> task) {
+                auto taskRunner = this->platform.GetForegroundTaskRunner(&isolate);
+                taskRunner->PostTask(std::move(task));
                 this->isolate.RequestInterrupt(InterruptCallback, nullptr);
             }
 

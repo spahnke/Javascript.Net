@@ -36,7 +36,7 @@ namespace Noesis
                 const int CONTEXT_GROUP_ID = 1;
 
             private:
-                void CallTaskOnCurrentExecutionTask(DispatchMessageTask& task);
+                void CallTaskOnCurrentExecutionTask(std::unique_ptr<DispatchMessageTask> task);
                 v8::Isolate& isolate;
                 v8::Platform& platform;
                 bool terminated;
