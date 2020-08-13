@@ -109,31 +109,19 @@ JavascriptException::EndColumn::get()
 System::String^
 JavascriptException::GetExceptionMessage(TryCatch& iTryCatch)
 {
-	// Adding this location information is unhelpful because the library user can
-	// get the information from Line/StartColumn/EndColumn, and may not want it
-	// entangled with the message, or may want to localise it, or whatever.
-	//System::String^ location;
-    //
-	//v8::Local<v8::Message> message = iTryCatch.Message();
-	//if (!message.IsEmpty())
-	//	location = gcnew System::String((wchar_t*) *String::Value(message->GetScriptResourceName())) + ", line " + message->GetLineNumber();
-	//else
-	//	location = gcnew System::String("Unknown location");
-	
 	System::Exception^ exception = GetSystemException(iTryCatch);
 	if (exception != nullptr)
 	{
-		return gcnew System::String(exception->Message /*+ " (" + location + ")."*/);
+		return gcnew System::String(exception->Message);
 	}
 	else
 	{
-		if (iTryCatch.Exception()->IsNull())
-			// We get a null exception here when execution is terminated.
-			// Documentation shows a HasTerminated() method on TryCatch,
-			// but perhaps our copy of v8 is too old.
+		if (iTryCatch.HasTerminated())
 			return gcnew System::String(L"Execution Terminated");
-		else
-			return gcnew System::String((wchar_t*) *String::Value(JavascriptContext::GetCurrentIsolate(), iTryCatch.Exception())) /*+ " (" + location + ")"*/;
+		
+        String::Value stringValue(JavascriptContext::GetCurrentIsolate(), iTryCatch.Exception());
+        // Using a constructor which takes a length makes sure that we don't discard zero bytes in the middle of the string
+        return gcnew System::String((wchar_t*)* stringValue, 0, stringValue.length());
 	}
 }
 
@@ -149,9 +137,11 @@ JavascriptException::GetSystemException(TryCatch& iTryCatch)
 	v8::Local<v8::Value> v8exception = iTryCatch.Exception();
 	if (v8exception->IsObject()) {
 		v8::Local<v8::Object> exception_o = v8::Local<v8::Object>::Cast(v8exception);
-		v8::Local<v8::String> inner_exception_str = v8::String::NewFromUtf8(JavascriptContext::GetCurrentIsolate(), "InnerException", v8::NewStringType::kNormal).ToLocalChecked();
-		if (exception_o->HasOwnProperty(JavascriptContext::GetCurrentIsolate()->GetCurrentContext(), inner_exception_str).FromMaybe(false)) {
-			v8::Local<v8::Value> inner = exception_o->Get(inner_exception_str);
+        auto isolate = JavascriptContext::GetCurrentIsolate();
+        auto context = isolate->GetCurrentContext();
+		v8::Local<v8::String> inner_exception_str = v8::String::NewFromUtf8(isolate, "InnerException", v8::NewStringType::kNormal).ToLocalChecked();
+		if (exception_o->HasOwnProperty(context, inner_exception_str).FromMaybe(false)) {
+			v8::Local<v8::Value> inner = exception_o->Get(context, inner_exception_str).ToLocalChecked();
 			System::Object^ object = JavascriptInterop::UnwrapObject(inner);
 			return dynamic_cast<System::Exception^>(object);
 		}
