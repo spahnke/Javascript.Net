@@ -316,7 +316,7 @@ void AddToJSONMethod(Local<FunctionTemplate> functionTemplate, System::Object^ o
 
     auto isolate = JavascriptContext::GetCurrentIsolate();
     auto toJSONTemplate = FunctionTemplate::New(isolate, ToJSONCallback);
-    functionTemplate->PrototypeTemplate()->Set(String::NewFromUtf8(isolate, "toJSON"), toJSONTemplate);
+    functionTemplate->PrototypeTemplate()->Set(String::NewFromUtf8(isolate, "toJSON").ToLocalChecked(), toJSONTemplate);
 }
 
 // TODO: should return Local<External>
@@ -795,6 +795,8 @@ void JavascriptInterop::Enumerator(const PropertyCallbackInfo<Array>& iInfo)
 	
 	v8::Isolate* isolate = v8::Isolate::GetCurrent();
 	EscapableHandleScope handle_scope(isolate);
+    
+    auto context = isolate->GetCurrentContext();
 
     auto getObjectKeysMethod = GetObjectKeysMethod(self);
     if (getObjectKeysMethod != nullptr)
@@ -803,7 +805,7 @@ void JavascriptInterop::Enumerator(const PropertyCallbackInfo<Array>& iInfo)
         auto result_names = Array::New(isolate, keys->Length);
 
         for (int i = 0; i < keys->Length; i++)
-            result_names->Set(i, JavascriptInterop::ConvertToV8(keys[i]));
+            result_names->Set(context, i, JavascriptInterop::ConvertToV8(keys[i]));
 
         iInfo.GetReturnValue().Set<Array>(handle_scope.Escape(result_names));
         return;
@@ -819,7 +821,7 @@ void JavascriptInterop::Enumerator(const PropertyCallbackInfo<Array>& iInfo)
             continue;
         if (member->Name == "Item" && member->GetIndexParameters()->Length > 0)
             continue; // skip indexer properties
-        result_names->Set(i, JavascriptInterop::ConvertToV8(member->Name));
+        result_names->Set(context, i, JavascriptInterop::ConvertToV8(member->Name));
 	}
 
 	iInfo.GetReturnValue().Set<Array>(handle_scope.Escape(result_names));
