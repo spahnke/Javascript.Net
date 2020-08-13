@@ -74,6 +74,7 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Numerics" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Xml.Linq" />
   </ItemGroup>
@@ -118,8 +119,8 @@
     <PostBuildEvent>copy $(ProjectDir)..\..\$(V8Platform)\$(Configuration)\v8.dll $(ProjectDir)$(OutDir)
 copy $(ProjectDir)..\..\$(V8Platform)\$(Configuration)\v8_libbase.dll $(ProjectDir)$(OutDir)
 copy $(ProjectDir)..\..\$(V8Platform)\$(Configuration)\v8_libplatform.dll $(ProjectDir)$(OutDir)
+copy $(ProjectDir)..\..\$(V8Platform)\$(Configuration)\zlib.dll $(ProjectDir)$(OutDir)
 copy $(ProjectDir)..\..\$(V8Platform)\$(Configuration)\icu*.* $(ProjectDir)$(OutDir)
-copy $(ProjectDir)..\..\$(V8Platform)\$(Configuration)\*.bin $(ProjectDir)$(OutDir)
 </PostBuildEvent>
   </PropertyGroup>
 </Project>

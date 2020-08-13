@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using FluentAssertions;
 using System.Text.RegularExpressions;
+using System.Numerics;
 
 namespace Noesis.Javascript.Tests
 {
@@ -24,6 +25,11 @@ namespace Noesis.Javascript.Tests
             public int methodWithOneParameter(int i)
             {
                 return i + 1;
+            }
+
+            public int methodWithEnumParameter(UriHostNameType t)
+            {
+                return (int)t;
             }
 
             public string methodWithMultipleMixedParameters(int i, string s, bool b)
@@ -109,6 +115,22 @@ namespace Noesis.Javascript.Tests
         }
 
         [TestMethod]
+        public void ReadStringWithZeroByte()
+        {
+            _context.Run("var myString = 'a\\0b'");
+
+            _context.GetParameter("myString").Should().BeOfType<string>().Which.Should().Be("a\0b");
+        }
+
+        [TestMethod]
+        public void ReadStringWithMultipleZeroBytes()
+        {
+            _context.Run("var myString = 'a\\0\\0b'");
+
+            _context.GetParameter("myString").Should().BeOfType<string>().Which.Should().Be("a\0\0b");
+        }
+
+        [TestMethod]
         public void ReadArray()
         {
             _context.Run("var myArray = [11,22,33]");
@@ -150,6 +172,28 @@ namespace Noesis.Javascript.Tests
 
             var regex = _context.GetParameter("myRegExp");
             regex.Should().BeOfType<Regex>().Which.ShouldBeEquivalentTo(new Regex("abc", RegexOptions.ECMAScript | RegexOptions.IgnoreCase | RegexOptions.Multiline));
+        }
+
+        [TestMethod]
+        public void ReadBigIntLiteral()
+        {
+            var bigInt = _context.Run("1n");
+            bigInt.Should().BeOfType<BigInteger>().Which.Should().Be(new BigInteger(1));
+        }
+
+        [TestMethod]
+        public void ReadBigIntObject()
+        {
+            var bigInt = _context.Run("BigInt(1)");
+            bigInt.Should().BeOfType<BigInteger>().Which.Should().Be(new BigInteger(1));
+        }
+
+        [TestMethod]
+        public void ReadLargeBigIntLiteral()
+        {
+            var bigInt = _context.Run("2n ** 222n");
+            var expected = BigInteger.Pow(new BigInteger(2), 222);
+            bigInt.Should().BeOfType<BigInteger>().Which.Should().Be(expected);
         }
 
         [TestMethod]
@@ -219,6 +263,25 @@ namespace Noesis.Javascript.Tests
             var result = _context.Run("obj.methodWithOneParameter(1)");
 
             result.Should().Be(2);
+        }
+
+        [TestMethod]
+        public void MethodCallWithEnumParameter()
+        {
+            var obj = new TypedPropertiesClass();
+            _context.SetParameter("obj", obj);
+            var result = _context.Run("obj.methodWithEnumParameter('IPv4')");
+            result.Should().Be((int)UriHostNameType.IPv4);
+        }
+
+        [TestMethod]
+        public void MethodCallWithBadEnumParameter()
+        {
+            var obj = new TypedPropertiesClass();
+            _context.SetParameter("obj", obj);
+            Action action = () => _context.Run("obj.methodWithEnumParameter('dog')");
+            action.ShouldThrow<JavascriptException>("'dog' is not a member of the required enum")
+                  .Which.Message.Should().Contain("Argument mismatch");
         }
 
         [TestMethod]
