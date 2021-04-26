@@ -26,6 +26,7 @@ public ref class JavascriptFunction
 public:
 	JavascriptFunction(v8::Local<v8::Object> iFunction, JavascriptContext^ context);
 	~JavascriptFunction();
+    !JavascriptFunction();
 
 	System::Object^ Call(... cli::array<System::Object^>^ args);
 
@@ -37,7 +38,9 @@ public:
 internal:
     v8::Persistent<v8::Function>* mFuncHandle;
 private:
-	JavascriptContext^ mContext;
+    System::WeakReference^ mContextHandle;
+    inline JavascriptContext^ GetContext() { return mContextHandle->IsAlive ? safe_cast<JavascriptContext^>(mContextHandle->Target) : nullptr; }
+    inline bool IsAlive() { auto context = GetContext(); return context != nullptr && !context->IsDisposed() && mFuncHandle != nullptr; }
 };
 
 //////////////////////////////////////////////////////////////////////////
