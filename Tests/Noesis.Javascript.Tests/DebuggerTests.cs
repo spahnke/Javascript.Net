@@ -449,6 +449,7 @@ function activeWait(seconds)
                     isModule = false,
                     length = 13,
                     scriptLanguage = "JavaScript",
+                    embedderName = "",
                 }
             });
 
@@ -508,6 +509,7 @@ function activeWait(seconds)
                     isModule = false,
                     length = 20,
                     scriptLanguage = "JavaScript",
+                    embedderName = "",
                 }
             });
 
@@ -563,7 +565,7 @@ function activeWait(seconds)
                     {
                         new
                         {
-                            callFrameId = "{\"ordinal\":0,\"injectedScriptId\":1}",
+                            callFrameId = "1111111111111111111.1.0",
                             functionName = "",
                             functionLocation = new
                             {
@@ -588,7 +590,7 @@ function activeWait(seconds)
                                         type = "object",
                                         className = "global",
                                         description = "global",
-                                        objectId = "{\"injectedScriptId\":1,\"id\":1}"
+                                        objectId = "1111111111111111111.1.1"
                                     }
                                 }
                             },
@@ -597,7 +599,7 @@ function activeWait(seconds)
                                 type = "object",
                                 className = "global",
                                 description = "global",
-                                objectId = "{\"injectedScriptId\":1,\"id\":2}"
+                                objectId = "1111111111111111111.1.2"
                             }
                         }
                     },
@@ -618,10 +620,10 @@ function activeWait(seconds)
             // replacements to fit the dynamic test values
             dynamic @params = scriptExecution.DebuggerPausedNotificationAfterStart.MessageObj.@params;
             string expectedNotifyAtStart = notifyAtStartExpectedLike
-                .Replace("{\"ordinal\":0,\"injectedScriptId\":1}", @params.callFrames[0].callFrameId.ToString())
                 .Replace("999", @params.callFrames[0].functionLocation.scriptId.ToString())
-                .Replace("{\"injectedScriptId\":1,\"id\":1}", @params.callFrames[0].scopeChain[0].@object.objectId.ToString())
-                .Replace("{\"injectedScriptId\":1,\"id\":2}", @params.callFrames[0].@this.objectId.ToString())
+                .Replace("1111111111111111111.1.0", @params.callFrames[0].callFrameId.ToString())
+                .Replace("1111111111111111111.1.1", @params.callFrames[0].scopeChain[0].@object.objectId.ToString())
+                .Replace("1111111111111111111.1.2", @params.callFrames[0].@this.objectId.ToString())
                 .Replace("DebuggerStart:{2f265089-b2a8-4347-b64b-d091d0bac9a3}", @params.reason.ToString());
 
             // test it
@@ -699,7 +701,7 @@ function activeWait(seconds)
                     {
                         new
                         {
-                            callFrameId = "{\"ordinal\":0,\"injectedScriptId\":1}",
+                            callFrameId = "1111111111111111111.1.0",
                             functionName = "",
                             functionLocation = new
                             {
@@ -724,7 +726,7 @@ function activeWait(seconds)
                                         type = "object",
                                         className = "global",
                                         description = "global",
-                                        objectId = "{\"injectedScriptId\":1,\"id\":3}"
+                                        objectId = "1111111111111111111.1.3"
                                     }
                                 }
                             },
@@ -733,7 +735,7 @@ function activeWait(seconds)
                                 type = "object",
                                 className = "global",
                                 description = "global",
-                                objectId = "{\"injectedScriptId\":1,\"id\":4}"
+                                objectId = "1111111111111111111.1.4"
                             }
                         }
                     },
@@ -799,6 +801,9 @@ function activeWait(seconds)
             dynamic @params = pauseHitBreakpointNotificationMessage.MessageObj.@params;
             string expectedPauseHitBreakpointNotification = pauseHitBreakpointNotificationExpectedLike
                 .Replace("999", @params.callFrames[0].functionLocation.scriptId.ToString())
+                .Replace("1111111111111111111.1.0", @params.callFrames[0].callFrameId.ToString())
+                .Replace("1111111111111111111.1.3", @params.callFrames[0].scopeChain[0].@object.objectId.ToString())
+                .Replace("1111111111111111111.1.4", @params.callFrames[0].@this.objectId.ToString())
                 .Replace("4:0:0:9", @params.hitBreakpoints[0].ToString());
 
             // test it
