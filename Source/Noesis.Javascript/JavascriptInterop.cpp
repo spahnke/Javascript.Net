@@ -190,6 +190,8 @@ JavascriptInterop::ConvertToV8(System::Object^ iObject)
 		if (type->IsValueType)
 		{
 			// Common types first.
+            if (type == System::Byte::typeid)
+                return v8::Int32::New(isolate, safe_cast<unsigned char>(iObject));
 			if (type == System::Int32::typeid)
 				return v8::Int32::New(isolate, safe_cast<int>(iObject));
 			if (type == System::Double::typeid)
@@ -223,8 +225,6 @@ JavascriptInterop::ConvertToV8(System::Object^ iObject)
 					return v8::Int32::New(isolate, safe_cast<short>(iObject));
 				if (type == System::SByte::typeid)
 					return v8::Int32::New(isolate, safe_cast<signed char>(iObject));
-				if (type == System::Byte::typeid)
-					return v8::Int32::New(isolate, safe_cast<unsigned char>(iObject));
 				if (type == System::UInt16::typeid)
 					return v8::Uint32::New(isolate, safe_cast<unsigned short>(iObject));
 				if (type == System::UInt32::typeid)
@@ -491,19 +491,14 @@ JavascriptInterop::ConvertRegexFromV8(Local<Value> iValue)
 v8::Local<v8::Value>
 JavascriptInterop::ConvertFromSystemArray(System::Array^ iArray) 
 {
-	int lenght = iArray->Length;
+	int length = iArray->Length;
 	v8::Isolate *isolate = JavascriptContext::GetCurrentIsolate();
-	Local<Context> context = isolate->GetCurrentContext();
-	v8::Local<v8::Array> result = v8::Array::New(isolate);
+    std::vector<Local<Value>> values(length);
 	
-	// Transform the .NET array into a Javascript array 
-	for (int i = 0; i < lenght; i++) 
-	{
-		v8::Local<v8::Value> key = v8::Int32::New(isolate, i);
-		result->Set(context, key, ConvertToV8(iArray->GetValue(i))).ToChecked();
-	}
+	for (int i = 0; i < length; i++) 
+        values[i] = ConvertToV8(iArray->GetValue(i));
 
-	return result;
+	return v8::Array::New(isolate, values.data(), length);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
