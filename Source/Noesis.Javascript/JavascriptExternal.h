@@ -86,8 +86,7 @@ public:
 
     Local<Function> GetIterator();
 
-    void Wrap(Isolate* isolate, Local<Object> object);
-
+    Local<Object> ToLocal(Isolate* isolate);
 	////////////////////////////////////////////////////////////
 	// Data members
 	////////////////////////////////////////////////////////////
@@ -100,6 +99,8 @@ private:
 	System::Runtime::InteropServices::GCHandle mObjectHandle;
 
 	SetParameterOptions mOptions;
+
+    void InitializePersistent(Isolate* isolate, Local<Object> object);
 
     static void IteratorCallback(const v8::FunctionCallbackInfo<Value>& iArgs);
     static void IteratorNextCallback(const v8::FunctionCallbackInfo<Value>& iArgs);

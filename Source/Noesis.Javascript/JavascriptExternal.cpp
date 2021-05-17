@@ -79,11 +79,53 @@ void GCCallback(const WeakCallbackInfo<JavascriptExternal>& data)
 }
 
 void
-JavascriptExternal::Wrap(Isolate* isolate, Local<Object> object)
+JavascriptExternal::InitializePersistent(Isolate* isolate, Local<Object> object)
 {
     object->SetInternalField(0, External::New(isolate, this));
     mPersistent.Reset(isolate, object);
     mPersistent.SetWeak(this, &GCCallback, WeakCallbackType::kParameter);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void ToJSONCallback(const FunctionCallbackInfo<Value>& iArgs)
+{
+    auto isolate = iArgs.GetIsolate();
+    auto self = (System::Object^)JavascriptInterop::UnwrapObject(Local<External>::Cast(iArgs.Holder()->GetInternalField(0)));
+    auto getJSONMethod = self->GetType()->GetMethod("ToJSON");
+    iArgs.GetReturnValue().Set(JavascriptInterop::ConvertToV8(getJSONMethod->Invoke(self, nullptr)));
+}
+
+void AddToJSONMethod(Local<FunctionTemplate> functionTemplate, System::Object^ object)
+{
+    auto self = object;
+    auto getJSONMethod = self->GetType()->GetMethod("ToJSON");
+    if (getJSONMethod == nullptr)
+        return;
+
+    auto isolate = JavascriptContext::GetCurrentIsolate();
+    auto toJSONTemplate = FunctionTemplate::New(isolate, ToJSONCallback);
+    functionTemplate->PrototypeTemplate()->Set(String::NewFromUtf8(isolate, "toJSON").ToLocalChecked(), toJSONTemplate);
+}
+
+Local<Object>
+JavascriptExternal::ToLocal(Isolate* isolate)
+{
+    if (!mPersistent.IsEmpty())
+        return Local<Object>::New(isolate, mPersistent);
+    
+    auto context = JavascriptContext::GetCurrent();
+
+    EscapableHandleScope scope(isolate);
+
+    Local<FunctionTemplate> templ = context->GetObjectWrapperConstructorTemplate(GetObject()->GetType());
+    AddToJSONMethod(templ, GetObject());
+
+    Local<ObjectTemplate> instanceTemplate = templ->InstanceTemplate();
+    Local<Object> object = instanceTemplate->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+    InitializePersistent(isolate, object);
+
+    return scope.Escape(object);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -395,7 +437,7 @@ void JavascriptExternal::IteratorCallback(const v8::FunctionCallbackInfo<Value>&
 
     auto context = JavascriptContext::GetCurrent();
     auto enumeratorExternal = context->WrapObject(enumerator);
-    enumeratorExternal->Wrap(isolate, iteratorInstance);
+    enumeratorExternal->InitializePersistent(isolate, iteratorInstance);
 
     iArgs.GetReturnValue().Set(iteratorInstance);
 }

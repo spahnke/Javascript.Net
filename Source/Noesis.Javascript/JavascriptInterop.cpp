@@ -299,26 +299,6 @@ JavascriptInterop::ConvertToV8(System::Object^ iObject)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void ToJSONCallback(const v8::FunctionCallbackInfo<Value>& iArgs)
-{
-    auto isolate = iArgs.GetIsolate();
-    auto self = (System::Object^) JavascriptInterop::UnwrapObject(Local<External>::Cast(iArgs.Holder()->GetInternalField(0)));
-    auto getJSONMethod = self->GetType()->GetMethod("ToJSON");
-    iArgs.GetReturnValue().Set(JavascriptInterop::ConvertToV8(getJSONMethod->Invoke(self, nullptr)));
-}
-
-void AddToJSONMethod(Local<FunctionTemplate> functionTemplate, System::Object^ object)
-{
-    auto self = object;
-    auto getJSONMethod = self->GetType()->GetMethod("ToJSON");
-    if (getJSONMethod == nullptr)
-        return;
-
-    auto isolate = JavascriptContext::GetCurrentIsolate();
-    auto toJSONTemplate = FunctionTemplate::New(isolate, ToJSONCallback);
-    functionTemplate->PrototypeTemplate()->Set(String::NewFromUtf8(isolate, "toJSON").ToLocalChecked(), toJSONTemplate);
-}
-
 // TODO: should return Local<External>
 Local<Object>
 JavascriptInterop::WrapObject(System::Object^ iObject)
@@ -329,21 +309,7 @@ JavascriptInterop::WrapObject(System::Object^ iObject)
     {
         v8::Isolate *isolate = JavascriptContext::GetCurrentIsolate();
         JavascriptExternal *external = context->WrapObject(iObject);
-        if (external->mPersistent.IsEmpty())
-        {
-            Local<FunctionTemplate> templ = context->GetObjectWrapperConstructorTemplate(iObject->GetType());
-            AddToJSONMethod(templ, iObject);
-
-            Local<ObjectTemplate> instanceTemplate = templ->InstanceTemplate();
-            Local<Object> object = instanceTemplate->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
-            external->Wrap(isolate, object);
-
-            return object;
-        }
-        else
-        {
-            return Local<Object>::New(isolate, external->mPersistent);
-        }
+        return external->ToLocal(isolate);
     }
 
 	throw gcnew System::Exception("No context currently active.");
