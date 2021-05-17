@@ -170,7 +170,7 @@ namespace Noesis.Javascript.Tests
             _context.SetParameter("person", person);
             //Assert.AreEqual("", _context.Run("JSON.stringify(person)")); // comment Address in Person and uncomment this to check the general shape of the JSON
             Action action = () => _context.Run("JSON.stringify(person)");
-            action.ShouldThrowExactly<JavascriptException>().Which.Message.Should().Be("RangeError: Maximum call stack size exceeded");
+            action.ShouldThrowExactly<JavascriptException>().Which.Message.Should().StartWith("TypeError: Converting circular structure to JSON");
         }
 
         [TestMethod]
