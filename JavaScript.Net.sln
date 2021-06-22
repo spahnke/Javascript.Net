@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.31112.23
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "JavaScript.Net", "Source\Noesis.Javascript\JavaScript.Net.vcxproj", "{7ECFED5E-8B33-4065-ACBF-AB1050FB0F4C}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Fiddling", "Fiddling\Fiddling.csproj", "{9E0C9657-BC4C-4A25-B7DD-9C772FC5670D}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "JavaScript.Net", "Source\Noesis.Javascript\JavaScript.Net.vcxproj", "{7ECFED5E-8B33-4065-ACBF-AB1050FB0F4C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Noesis.Javascript.Tests", "Tests\Noesis.Javascript.Tests\Noesis.Javascript.Tests.csproj", "{1659A790-7DAC-4E1C-B2C8-B51AC6B0AF87}"
 EndProject
