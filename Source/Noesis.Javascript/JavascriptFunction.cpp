@@ -74,21 +74,28 @@ System::Object^ JavascriptFunction::Call(... cli::array<System::Object^>^ args)
 
 bool JavascriptFunction::operator==(JavascriptFunction^ func1, JavascriptFunction^ func2)
 {
-    bool func1_null = ReferenceEquals(func1, nullptr),
-         func2_null = ReferenceEquals(func2, nullptr);
-    if (func1_null != func2_null)
-		return false;
-    if (func1_null && func2_null)
+    if (ReferenceEquals(func1, func2))
         return true;
+    if (ReferenceEquals(func1, nullptr) != ReferenceEquals(func2, nullptr))
+        return false;
+
     if (!func1->IsAlive())
         throw gcnew JavascriptException(L"'func1's owning JavascriptContext has been disposed");
     if (!func2->IsAlive())
         throw gcnew JavascriptException(L"'func2's owning JavascriptContext has been disposed");
 
-	Local<Function> jsFuncPtr1 = func1->mFuncHandle->Get(func1->GetContext()->GetCurrentIsolate());
-	Local<Function> jsFuncPtr2 = func2->mFuncHandle->Get(func2->GetContext()->GetCurrentIsolate());
+    auto context = func1->GetContext();
+    if (func2->GetContext() != context)
+        return false;
 
-	return jsFuncPtr1->Equals(JavascriptContext::GetCurrentIsolate()->GetCurrentContext(), jsFuncPtr2).ToChecked();
+    JavascriptScope scope(context);
+    auto isolate = context->GetCurrentIsolate();
+    HandleScope handleScope(isolate);
+
+    auto jsFuncPtr1 = func1->mFuncHandle->Get(isolate);
+    auto jsFuncPtr2 = func2->mFuncHandle->Get(isolate);
+
+    return jsFuncPtr1->Equals(isolate->GetCurrentContext(), jsFuncPtr2).ToChecked();
 }
 
 bool JavascriptFunction::Equals(JavascriptFunction^ other)
