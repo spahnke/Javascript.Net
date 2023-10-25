@@ -7,17 +7,18 @@ namespace Noesis.Javascript.Tests
     [TestClass]
     public class FlagsTest
     {
-        [TestMethod]
-        public void CanUseEngineFlagsToSpecifyStrictMode()
+        [AssemblyInitialize]
+        public static void GlobalTestInitialize(TestContext testContext)
         {
-            JavascriptContext.SetFlags("--use_strict");
-            Action action = () =>
-            {
-                using (var context = new JavascriptContext())
-                    context.Run("globalVariable = 1;");
-            };
-            action.ShouldThrowExactly<JavascriptException>().WithMessage("ReferenceError: globalVariable is not defined");
-            JavascriptContext.SetFlags("--nouse_strict");
+            // this method must only be called once before V8 is initialized (i.e. before `UnmanagedInitialisation` has run)
+            JavascriptContext.SetFlags("--stack_size 256");
+        }
+
+        [TestMethod]
+        public void CannotSetFlagsAfterV8IsInitialized()
+        {
+            Action action = () => JavascriptContext.SetFlags("--use-strict");
+            action.ShouldThrowExactly<InvalidOperationException>().WithMessage("Flags can only be set once before the first context and therefore V8 is initialized.");
         }
     }
 }

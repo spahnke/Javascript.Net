@@ -125,8 +125,6 @@ public ref class JavascriptContext: public System::IDisposable
 	// Constructor
 	////////////////////////////////////////////////////////////
 public:
-    static JavascriptContext();
-
 	JavascriptContext();
 
 	~JavascriptContext();

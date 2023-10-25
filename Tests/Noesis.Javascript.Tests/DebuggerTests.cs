@@ -442,7 +442,7 @@ function activeWait(seconds)
                     endLine = 0,
                     endColumn = 13,
                     executionContextId = 1,
-                    hash = "386875cd3beb13f34be08c154f15871d0270c734",
+                    hash = "4b4bf43ccc1f3cc85d1d134b16bb29ee1e1f1f230df4d44730bcf3f2b7ca214b",
                     isLiveEdit = false,
                     sourceMapURL = "",
                     hasSourceURL = false,
@@ -503,7 +503,7 @@ function activeWait(seconds)
                     endLine = 0,
                     endColumn = 20,
                     executionContextId = 1,
-                    hash = "1475c6ae24578272642357e821b3ff9a3b2e3e9e",
+                    hash = "4d8ef253d0d0f972db01c0b096bedc31a59c0ac984ece8d58c9fb1bcd11d4cd0",
                     sourceMapURL = "",
                     hasSourceURL = false,
                     isModule = false,
@@ -600,7 +600,8 @@ function activeWait(seconds)
                                 className = "global",
                                 description = "global",
                                 objectId = "1111111111111111111.1.2"
-                            }
+                            },
+                            canBeRestarted = true,
                         }
                     },
                     reason = "DebuggerStart:{2f265089-b2a8-4347-b64b-d091d0bac9a3}",
@@ -736,7 +737,8 @@ function activeWait(seconds)
                                 className = "global",
                                 description = "global",
                                 objectId = "1111111111111111111.1.4"
-                            }
+                            },
+                            canBeRestarted = true,
                         }
                     },
                     reason = "other",

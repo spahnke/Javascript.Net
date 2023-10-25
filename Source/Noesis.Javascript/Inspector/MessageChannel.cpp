@@ -11,7 +11,7 @@ namespace Noesis
             MessageChannel::MessageChannel(v8_inspector::V8Inspector* inspector, int contextGroupId, BackChannelDelegate^ backChannelDelegate)
             {
                 this->backChannelDelegate = backChannelDelegate;
-                this->session = inspector->connect(contextGroupId, this, v8_inspector::StringView());
+                this->session = inspector->connect(contextGroupId, this, v8_inspector::StringView(), v8_inspector::V8Inspector::kFullyTrusted);
             }
             
             void MessageChannel::DispatchProtocolMessage(System::String^ message)

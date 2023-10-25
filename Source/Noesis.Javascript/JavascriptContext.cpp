@@ -119,12 +119,6 @@ v8::Local<v8::String> ToV8String(Isolate* isolate, System::String^ value) {
     return String::NewFromTwoByte(isolate, (uint16_t*)name, v8::NewStringType::kNormal).ToLocalChecked();
 }
 
-static JavascriptContext::JavascriptContext()
-{
-    UnmanagedInitialisation();
-    JavascriptContext::currentPlatform = platform;
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -160,6 +154,16 @@ v8::Platform* JavascriptContext::GetCurentPlatform()
 
 JavascriptContext::JavascriptContext()
 {
+    if (!initialized)
+    {
+        // Certain static operations like setting flags cannot be performed after V8 has been initialized. Since we allow setting flags by
+        // a static method we can't do the unmanaged initialization in the static constructor, because that would always run before any other
+        // static method. Instead we call it here. The if block as well as the internal checks in UnmanagedInitialisation should suffice to
+        // prevent any kind of race condition here.
+        UnmanagedInitialisation();
+        JavascriptContext::currentPlatform = platform;
+    }
+
 	// Unfortunately the fatal error handler is not installed early enough to catch
     // out-of-memory errors while creating new isolates
     // (see my post Catching V8::FatalProcessOutOfMemory while creating an isolate (SetFatalErrorHandler does not work)).
@@ -222,6 +226,8 @@ void JavascriptContext::SetFatalErrorHandler(FatalErrorHandler^ handler)
 
 void JavascriptContext::SetFlags(System::String^ flags)
 {
+    if (initialized)
+        throw gcnew System::InvalidOperationException("Flags can only be set once before the first context and therefore V8 is initialized.");
     std::string convertedFlags = msclr::interop::marshal_as<std::string>(flags);
     v8::V8::SetFlagsFromString(convertedFlags.c_str(), (int)convertedFlags.length());
 }
