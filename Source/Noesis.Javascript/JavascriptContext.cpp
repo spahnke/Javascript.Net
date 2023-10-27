@@ -561,6 +561,11 @@ System::String^ JavascriptContext::V8Version::get()
 	return gcnew System::String(v8::V8::GetVersion());
 }
 
+bool JavascriptContext::IsV8Initialized::get()
+{
+    return initialized;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Local<Script>
