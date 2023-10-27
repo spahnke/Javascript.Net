@@ -168,8 +168,8 @@ JavascriptContext::JavascriptContext()
         // static method. Instead we call it here. The if block as well as the internal checks in UnmanagedInitialisation should suffice to
         // prevent any kind of race condition here.
         UnmanagedInitialisation();
-        JavascriptContext::currentPlatform = platform;
     }
+    JavascriptContext::currentPlatform = platform; // always set this because it is written to a managed static field which is local to an app domain
 
 	v8::Isolate::CreateParams create_params;
 	create_params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
