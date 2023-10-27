@@ -53,6 +53,19 @@ namespace Noesis { namespace Javascript {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Static function so it can be called from unmanaged code.
+void FatalErrorCallback(const char *location, const char *message)
+{
+    JavascriptContext::FatalErrorCallbackMember(location, message);
+    raise(SIGABRT);  // Exit immediately.
+}
+
+void FatalMemoryErrorCallback(const char *location, const v8::OOMDetails &details)
+{
+    JavascriptContext::FatalErrorCallbackMember(location, details.detail);
+    raise(SIGABRT);  // Exit immediately.
+}
+
 #pragma managed(push, off)
 	void GetPathsForInitialisation(char dll_path[MAX_PATH], char icudtl_dat_path[MAX_PATH])
 	{
@@ -104,6 +117,7 @@ namespace Noesis { namespace Javascript {
         GetPathsForInitialisation(dll_path, icudtl_dat_path);
         v8::V8::InitializeICUDefaultLocation(dll_path, icudtl_dat_path);
         platform = v8::platform::NewDefaultPlatform().release();
+        v8::V8::SetFatalMemoryErrorCallback(FatalMemoryErrorCallback);
         v8::V8::InitializePlatform(platform);
         v8::V8::Initialize();
         initialized = true;
@@ -121,13 +135,6 @@ v8::Local<v8::String> ToV8String(Isolate* isolate, System::String^ value) {
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// Static function so it can be called from unmanaged code.
-void FatalErrorCallback(const char* location, const char* message)
-{
-	JavascriptContext::FatalErrorCallbackMember(location, message);
-	raise(SIGABRT);  // Exit immediately.
-}
 
 void JavascriptContext::FatalErrorCallbackMember(const char* location, const char* message)
 {
@@ -164,12 +171,6 @@ JavascriptContext::JavascriptContext()
         JavascriptContext::currentPlatform = platform;
     }
 
-	// Unfortunately the fatal error handler is not installed early enough to catch
-    // out-of-memory errors while creating new isolates
-    // (see my post Catching V8::FatalProcessOutOfMemory while creating an isolate (SetFatalErrorHandler does not work)).
-    // Also, HeapStatistics are only fetchable per-isolate, so they will not
-    // easily allow us to work out whether we are about to run out (although they
-    // would help us determine how much memory a new isolate used).
 	v8::Isolate::CreateParams create_params;
 	create_params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
 	isolate = v8::Isolate::New(create_params);
