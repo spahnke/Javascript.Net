@@ -161,14 +161,10 @@ v8::Platform* JavascriptContext::GetCurentPlatform()
 
 JavascriptContext::JavascriptContext()
 {
-    if (!initialized)
-    {
-        // Certain static operations like setting flags cannot be performed after V8 has been initialized. Since we allow setting flags by
-        // a static method we can't do the unmanaged initialization in the static constructor, because that would always run before any other
-        // static method. Instead we call it here. The if block as well as the internal checks in UnmanagedInitialisation should suffice to
-        // prevent any kind of race condition here.
-        UnmanagedInitialisation();
-    }
+    // Certain static operations like setting flags cannot be performed after V8 has been initialized. Since we allow setting flags by
+    // a static method we can't do the unmanaged initialization in the static constructor, because that would always run before any other
+    // static method. Instead we call it here. The internal checks in UnmanagedInitialisation make this thread safe.
+    UnmanagedInitialisation();
     JavascriptContext::currentPlatform = platform; // always set this because it is written to a managed static field which is local to an app domain
 
 	v8::Isolate::CreateParams create_params;
