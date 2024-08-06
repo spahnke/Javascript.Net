@@ -449,8 +449,23 @@ void JavascriptExternal::IteratorNextCallback(const v8::FunctionCallbackInfo<Val
     auto internalField = Local<External>::Cast(iArgs.Holder()->GetInternalField(0));
     auto external = (JavascriptExternal*)internalField->Value();
     auto enumerator = (System::Collections::IEnumerator^) external->GetObject();
-    auto done = !enumerator->MoveNext();
 
+    auto done = true;
+    try
+    {
+        // MoveNext might throw in which case we need to schedule a JS exception with the isolate otherwise the JS code
+        // can't catch that error and the script execution terminates immediately instead.
+        done = !enumerator->MoveNext();
+    }
+    catch (System::Exception ^exception)
+    {
+        isolate->ThrowException(JavascriptInterop::ConvertToV8(exception));
+    }
+
+    // According to the iterator protocol we must always return a valid IteratorResult object. In case of an error we
+    // just leave done as true.
+    //
+    // See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols#the_iterator_protocol
     auto resultTemplate = ObjectTemplate::New(isolate);
     auto result = resultTemplate->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
     result->Set(isolate->GetCurrentContext(), String::NewFromUtf8(isolate, "done").ToLocalChecked(), JavascriptInterop::ConvertToV8(done));
