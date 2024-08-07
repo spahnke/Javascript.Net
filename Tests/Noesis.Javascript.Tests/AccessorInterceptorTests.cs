@@ -962,5 +962,22 @@ result;
 ");
             result.Should().Be(-3);
         }
+
+        [TestMethod]
+        public void IEnumerableProperty_UsingForOfLoopToIterate_ExceptionDuringImplicitNextHasAJavascriptStacktraceAndSourceAndLineInformation()
+        {
+            var enumerable = new ClassWithEnumerableProperty();
+            _context.SetParameter("enumerable", enumerable);
+            Action action = () => _context.Run(@"
+let result = 0;
+for (const item of enumerable.ItemsWithException)
+    result += item;
+result;
+", "iterate.js");
+            var e = action.ShouldThrowExactly<JavascriptException>().And;
+            e.Data["V8StackTrace"].Should().Be("Error: Inside MoveNext\n    at iterate.js:3:12");
+            e.Source.Should().Be("iterate.js");
+            e.Line.Should().Be(3);
+        }
     }
 }
