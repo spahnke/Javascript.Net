@@ -22,7 +22,7 @@ namespace Noesis.Javascript.Tests
             {
                 JavascriptContext.IsV8Initialized.Should().BeTrue();
                 Action action = () => JavascriptContext.SetFlags("--use-strict");
-                action.ShouldThrowExactly<InvalidOperationException>().WithMessage("Flags can only be set once before the first context and therefore V8 is initialized.");
+                action.Should().ThrowExactly<InvalidOperationException>().WithMessage("Flags can only be set once before the first context and therefore V8 is initialized.");
             }
         }
     }

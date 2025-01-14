@@ -170,7 +170,7 @@ namespace Noesis.Javascript.Tests
             _context.SetParameter("person", person);
             //Assert.AreEqual("", _context.Run("JSON.stringify(person)")); // comment Address in Person and uncomment this to check the general shape of the JSON
             Action action = () => _context.Run("JSON.stringify(person)");
-            action.ShouldThrowExactly<JavascriptException>().Which.Message.Should().StartWith("TypeError: Converting circular structure to JSON");
+            action.Should().ThrowExactly<JavascriptException>().Which.Message.Should().StartWith("TypeError: Converting circular structure to JSON");
         }
 
         [TestMethod]
@@ -528,7 +528,7 @@ result;");
             _context.SetParameter("myObject", new ClassWithProperty(), SetParameterOptions.RejectUnknownProperties);
 
             Action action = () => _context.Run("myObject.UnknownProperty = 77");
-            action.ShouldThrowExactly<JavascriptException>();
+            action.Should().ThrowExactly<JavascriptException>();
         }
         
         [TestMethod]
@@ -537,7 +537,7 @@ result;");
             _context.SetParameter("myObject", new ClassWithProperty(), SetParameterOptions.RejectUnknownProperties);
 
             Action action = () => _context.Run("myObject.UnknownProperty");
-            action.ShouldThrowExactly<JavascriptException>().Which.Message.Should().StartWith("Unknown member:");
+            action.Should().ThrowExactly<JavascriptException>().Which.Message.Should().StartWith("Unknown member:");
         }
 
         class ClassForTypeCoercion
@@ -811,7 +811,7 @@ result;
             var enumerable = new ClassWithEnumerableProperty();
             _context.SetParameter("enumerable", enumerable);
             var result = _context.Run(@"[...enumerable.Items];");
-            result.ShouldBeEquivalentTo(new int[] { 1, 2, 3 });
+            result.Should().BeEquivalentTo(new int[] { 1, 2, 3 });
         }
 
         [TestMethod]
@@ -820,7 +820,7 @@ result;
             var enumerable = new ClassWithEnumerableProperty();
             _context.SetParameter("enumerable", enumerable);
             var result = _context.Run(@"[...enumerable.ComplexItems]");
-            result.ShouldBeEquivalentTo(new ClassWithDecimalProperty[] 
+            result.Should().BeEquivalentTo(new ClassWithDecimalProperty[] 
             {
                 new ClassWithDecimalProperty { D = 1 },
                 new ClassWithDecimalProperty { D = 2 },
@@ -846,7 +846,7 @@ array.map(x => x.D).join(', ');
             var enumerable = new ClassWithEnumerableProperty();
             _context.SetParameter("enumerable", enumerable);
             Action action = () => _context.Run(@"enumerable[Symbol.iterator]()");
-            action.ShouldThrow<JavascriptException>("TypeError: enumerable[Symbol.iterator] is not a function");
+            action.Should().Throw<JavascriptException>("TypeError: enumerable[Symbol.iterator] is not a function");
         }
 
         [TestMethod]
@@ -974,7 +974,7 @@ for (const item of enumerable.ItemsWithException)
     result += item;
 result;
 ", "iterate.js");
-            var e = action.ShouldThrowExactly<JavascriptException>().And;
+            var e = action.Should().ThrowExactly<JavascriptException>().And;
             e.Data["V8StackTrace"].Should().Be("Error: Inside MoveNext\n    at iterate.js:3:12");
             e.Source.Should().Be("iterate.js");
             e.Line.Should().Be(3);
