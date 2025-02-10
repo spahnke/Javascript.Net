@@ -274,7 +274,7 @@ JavascriptContext::SetParameter(System::String^ iName, System::Object^ iObject, 
 	if (options != SetParameterOptions::None) {
 		Local<v8::Object> obj = value.As<v8::Object>();
 		if (!obj.IsEmpty()) {
-			Local<v8::External> wrap = obj->GetInternalField(0).As<v8::External>();
+			Local<v8::External> wrap = obj->GetInternalField(0).As<v8::Value>().As<v8::External>();
 			if (!wrap.IsEmpty()) {
 				JavascriptExternal* external = static_cast<JavascriptExternal*>(wrap->Value());
 				external->SetOptions(options);
@@ -303,7 +303,8 @@ void JavascriptContext::SetConstructor(System::String^ name, System::Type^ assoc
     Local<String> className = ToV8String(isolate, name);
     Local<FunctionTemplate> functionTemplate = JavascriptInterop::GetFunctionTemplateFromSystemDelegate(constructor);
     functionTemplate->SetClassName(className);
-    JavascriptInterop::InitObjectWrapperTemplate(functionTemplate->InstanceTemplate());
+    auto instanceTemplate = functionTemplate->InstanceTemplate();
+    JavascriptInterop::InitObjectWrapperTemplate(instanceTemplate);
     mTypeToConstructorMapping[associatedType] = System::IntPtr(new Persistent<FunctionTemplate>(isolate, functionTemplate));
     Local<Context>::New(isolate, *mContext)->Global()->Set(context, className, functionTemplate->GetFunction(context).ToLocalChecked());
 }
@@ -512,7 +513,8 @@ JavascriptContext::Exit(v8::Locker *locker, JavascriptContext^ old_context)
 void
 JavascriptContext::Collect()
 {
-    while(!this->isolate->IdleNotificationDeadline(1)) {};
+    // TODO(seb) unused?
+    this->isolate->MemoryPressureNotification(v8::MemoryPressureLevel::kModerate);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -542,7 +544,8 @@ JavascriptContext::GetObjectWrapperConstructorTemplate(System::Type ^type)
     System::IntPtr ptrToConstructor;
     if (!mTypeToConstructorMapping->TryGetValue(type, ptrToConstructor)) {
         Local<FunctionTemplate> constructor = FunctionTemplate::New(GetCurrentIsolate());
-        JavascriptInterop::InitObjectWrapperTemplate(constructor->InstanceTemplate());
+        auto instanceTemplate = constructor->InstanceTemplate();
+        JavascriptInterop::InitObjectWrapperTemplate(instanceTemplate);
         mTypeToConstructorMapping[type] = System::IntPtr(new Persistent<FunctionTemplate>(isolate, constructor));
         return constructor;
     }
@@ -582,7 +585,7 @@ CompileScript(v8::Isolate *isolate, wchar_t const *source_code, wchar_t const *r
 		else
 		{
 			Local<String> resource = String::NewFromTwoByte(isolate, (uint16_t const *)resource_name, v8::NewStringType::kNormal).ToLocalChecked();
-            ScriptOrigin *origin = new ScriptOrigin(isolate, resource);
+            ScriptOrigin *origin = new ScriptOrigin(resource);
 			script = Script::Compile(JavascriptContext::GetCurrentIsolate()->GetCurrentContext(), source, origin);
 		}
 
