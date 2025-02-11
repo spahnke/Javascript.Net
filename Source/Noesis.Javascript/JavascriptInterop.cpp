@@ -672,7 +672,7 @@ JavascriptInterop::IsSystemObject(Local<Value> iValue)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void
+Intercepted
 JavascriptInterop::Getter(Local<Name> iName, const PropertyCallbackInfo<Value>& iInfo)
 {
     Isolate* isolate = iInfo.GetIsolate();
@@ -689,13 +689,13 @@ JavascriptInterop::Getter(Local<Name> iName, const PropertyCallbackInfo<Value>& 
         function = wrapper->GetMethod(name);
         if (!function.IsEmpty()) {
             iInfo.GetReturnValue().Set(function);  // good value or exception
-            return;
+            return Intercepted::kYes;
         }
 
         // As for GetMethod().
         if (wrapper->GetProperty(name, value)) {
             iInfo.GetReturnValue().Set(value);  // good value or exception
-            return;
+            return Intercepted::kYes;
         }
 
         // map toString with ToString
@@ -704,7 +704,7 @@ JavascriptInterop::Getter(Local<Name> iName, const PropertyCallbackInfo<Value>& 
             function = wrapper->GetMethod(L"ToString");
             if (!function.IsEmpty()) {
                 iInfo.GetReturnValue().Set(function);
-                return;
+                return Intercepted::kYes;
             }
         }
     }
@@ -713,33 +713,35 @@ JavascriptInterop::Getter(Local<Name> iName, const PropertyCallbackInfo<Value>& 
         // iterator symbol
         if (iName == Symbol::GetIterator(isolate))
         {
-            if (System::Collections::IEnumerable::typeid->IsAssignableFrom(wrapper->GetObject()->GetType()))
-                iInfo.GetReturnValue().Set(wrapper->GetIterator());
-            else
-                iInfo.GetReturnValue().Set(Undefined(isolate));
-            return;
+            if (!System::Collections::IEnumerable::typeid->IsAssignableFrom(wrapper->GetObject()->GetType()))
+                return Intercepted::kNo;
+            iInfo.GetReturnValue().Set(wrapper->GetIterator());
+            return Intercepted::kYes;
         }
     }
 
 	// member not found
 	if ((wrapper->GetOptions() & SetParameterOptions::RejectUnknownProperties) == SetParameterOptions::RejectUnknownProperties) {
 		iInfo.GetReturnValue().Set(isolate->ThrowException(JavascriptInterop::ConvertToV8("Unknown member: " + gcnew System::String((wchar_t*) *String::Value(JavascriptContext::GetCurrentIsolate(), iName)))));
-		return;
+        return Intercepted::kYes;
 	}
-	iInfo.GetReturnValue().Set(Local<Value>());
+    return Intercepted::kNo;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void
+Intercepted
 JavascriptInterop::Setter(Local<String> iName, Local<Value> iValue, const PropertyCallbackInfo<Value>& iInfo)
 {
 	wstring name = (wchar_t*) *String::Value(JavascriptContext::GetCurrentIsolate(), iName);
 	Local<External> external = iInfo.Holder()->GetInternalField(0).As<Value>().As<External>();
 	JavascriptExternal* wrapper = (JavascriptExternal*) external->Value();
 
-	// set property
-	iInfo.GetReturnValue().Set(wrapper->SetProperty(name, iValue));
+    auto value = wrapper->SetProperty(name, iValue);
+    if (!value.IsEmpty())
+        return Intercepted::kYes;
+    // member not found
+    return Intercepted::kNo;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -795,42 +797,36 @@ void JavascriptInterop::Enumerator(const PropertyCallbackInfo<Array>& iInfo)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void
+Intercepted
 JavascriptInterop::IndexGetter(uint32_t iIndex, const PropertyCallbackInfo<Value> &iInfo)
 {
 	Local<External> external = iInfo.Holder()->GetInternalField(0).As<Value>().As<External>();
 	JavascriptExternal* wrapper = (JavascriptExternal*) external->Value();
 	Local<Value> value;
 
-	// get property
 	value = wrapper->GetProperty(iIndex);
 	if (!value.IsEmpty()) {
 		iInfo.GetReturnValue().Set(value);
-		return;
+        return Intercepted::kYes;
 	}
-
-	// member not found
-	iInfo.GetReturnValue().Set(Local<Value>());
+    // member not found
+    return Intercepted::kNo;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void
+Intercepted
 JavascriptInterop::IndexSetter(uint32_t iIndex, Local<Value> iValue, const PropertyCallbackInfo<Value> &iInfo)
 {
 	Local<External> external = iInfo.Holder()->GetInternalField(0).As<Value>().As<External>();
 	JavascriptExternal* wrapper = (JavascriptExternal*) external->Value();
 	Local<Value> value;
 
-	// get property
 	value = wrapper->SetProperty(iIndex, iValue);
-	if (!value.IsEmpty()) {
-		iInfo.GetReturnValue().Set(value);
-		return;
-	}
-
-	// member not found
-	iInfo.GetReturnValue().Set(Local<Value>());
+    if (!value.IsEmpty())
+        return Intercepted::kYes;
+    // member not found
+    return Intercepted::kNo;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
