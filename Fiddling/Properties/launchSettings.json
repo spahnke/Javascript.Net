@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Fiddling": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}
