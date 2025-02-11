@@ -513,7 +513,8 @@ JavascriptContext::Exit(v8::Locker *locker, JavascriptContext^ old_context)
 void
 JavascriptContext::Collect()
 {
-    // TODO(seb) unused?
+    // The method used originally here does not exist anymore and this is the best guess for a replacement.
+    // Since this isn't used in internal tests anywhere it can't be checked for validity.
     this->isolate->MemoryPressureNotification(v8::MemoryPressureLevel::kModerate);
 }
 
