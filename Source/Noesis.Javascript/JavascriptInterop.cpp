@@ -676,7 +676,7 @@ Intercepted
 JavascriptInterop::Getter(Local<Name> iName, const PropertyCallbackInfo<Value>& iInfo)
 {
     Isolate* isolate = iInfo.GetIsolate();
-	Local<External> external = iInfo.Holder()->GetInternalField(0).As<Value>().As<External>();
+	Local<External> external = iInfo.HolderV2()->GetInternalField(0).As<Value>().As<External>();
 	JavascriptExternal* wrapper = (JavascriptExternal*) external->Value();
 	Local<Function> function;
 	Local<Value> value;
@@ -734,7 +734,7 @@ Intercepted
 JavascriptInterop::Setter(Local<String> iName, Local<Value> iValue, const PropertyCallbackInfo<Value>& iInfo)
 {
 	wstring name = (wchar_t*) *String::Value(JavascriptContext::GetCurrentIsolate(), iName);
-	Local<External> external = iInfo.Holder()->GetInternalField(0).As<Value>().As<External>();
+	Local<External> external = iInfo.HolderV2()->GetInternalField(0).As<Value>().As<External>();
 	JavascriptExternal* wrapper = (JavascriptExternal*) external->Value();
 
     auto value = wrapper->SetProperty(name, iValue);
@@ -755,7 +755,7 @@ System::Reflection::MethodInfo^ GetObjectKeysMethod(System::Object^ self)
 
 void JavascriptInterop::Enumerator(const PropertyCallbackInfo<Array>& iInfo)
 {
-	Local<External> external = iInfo.Holder()->GetInternalField(0).As<Value>().As<External>();
+	Local<External> external = iInfo.HolderV2()->GetInternalField(0).As<Value>().As<External>();
 
 	JavascriptExternal* wrapper = (JavascriptExternal*)external->Value();
 
@@ -800,7 +800,7 @@ void JavascriptInterop::Enumerator(const PropertyCallbackInfo<Array>& iInfo)
 Intercepted
 JavascriptInterop::IndexGetter(uint32_t iIndex, const PropertyCallbackInfo<Value> &iInfo)
 {
-	Local<External> external = iInfo.Holder()->GetInternalField(0).As<Value>().As<External>();
+	Local<External> external = iInfo.HolderV2()->GetInternalField(0).As<Value>().As<External>();
 	JavascriptExternal* wrapper = (JavascriptExternal*) external->Value();
 	Local<Value> value;
 
@@ -818,7 +818,7 @@ JavascriptInterop::IndexGetter(uint32_t iIndex, const PropertyCallbackInfo<Value
 Intercepted
 JavascriptInterop::IndexSetter(uint32_t iIndex, Local<Value> iValue, const PropertyCallbackInfo<Value> &iInfo)
 {
-	Local<External> external = iInfo.Holder()->GetInternalField(0).As<Value>().As<External>();
+	Local<External> external = iInfo.HolderV2()->GetInternalField(0).As<Value>().As<External>();
 	JavascriptExternal* wrapper = (JavascriptExternal*) external->Value();
 	Local<Value> value;
 
@@ -846,7 +846,7 @@ void
 JavascriptInterop::Invoker(const v8::FunctionCallbackInfo<Value>& iArgs)
 {
 	v8::Isolate *isolate = JavascriptContext::GetCurrentIsolate();
-    auto internalField = iArgs.Holder()->GetInternalField(0).As<Value>().As<External>();
+    auto internalField = iArgs.This()->GetInternalField(0).As<Value>().As<External>();
     auto external = (JavascriptExternal*)internalField->Value();
 	System::Reflection::MethodInfo^ bestMethod;
 	cli::array<System::Object^>^ suppliedArguments;
