@@ -418,12 +418,12 @@ JavascriptInterop::ConvertObjectFromV8(Local<Object> iObject, ConvertedObjects &
  * We therefore construct date objects directly from the date components we get from V8 and vice versa.
  */
 
-double GetDateComponent(Isolate* isolate, Local<Date> date, const char* component)
+static int GetDateComponent(Isolate* isolate, Local<Date> date, const char* component)
 {
     auto context = isolate->GetCurrentContext();
     auto getComponent = date->Get(context, String::NewFromUtf8(isolate, component).ToLocalChecked()).ToLocalChecked().As<Function>();
     auto componentValue = getComponent->Call(context, date, 0, nullptr).ToLocalChecked();
-    return componentValue->NumberValue(isolate->GetCurrentContext()).ToChecked();
+    return (int)componentValue->NumberValue(isolate->GetCurrentContext()).ToChecked();
 }
 
 System::DateTime^ JavascriptInterop::ConvertDateFromV8(Local<Date> date)
