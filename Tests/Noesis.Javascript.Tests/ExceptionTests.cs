@@ -59,7 +59,7 @@ namespace Noesis.Javascript.Tests
 
         class ClassWithMethods
         {
-            public void Method(ClassWithMethods a) {}
+            public void Method(ClassWithMethods a) { }
             public void MethodThatThrows() { throw new Exception("Test C# exception"); }
             public void MethodThatThrowsWithZeroByte() { throw new Exception("Test C#\0exception"); }
         }
@@ -108,7 +108,8 @@ namespace Noesis.Javascript.Tests
         [TestMethod]
         public void TerminateExecutionHasNoRaceCondition()
         {
-            var task = new Task(() => {
+            var task = new Task(() =>
+            {
                 _context.Run("while (true) {}");
             });
             task.Start();
@@ -117,6 +118,35 @@ namespace Noesis.Javascript.Tests
             action.Should().Throw<AggregateException>("Because it was cancelled")
                 .WithInnerException<JavascriptException>()
                 .WithMessage("Execution Terminated");
+        }
+
+        [TestMethod]
+        public void ExceptionThatUsesConvertedObjectWontCrash()
+        {
+            // This test reproduces a bug where passing array/object parameters (which use 
+            // ConvertedObjects for caching during conversion) would cause exceptions to not
+            // propagate properly. The ConvertedObjects destructor was doing V8 operations
+            // (ToLocalChecked) after ThrowException() was called, which cleared  the pending exception.
+
+            Action<string, object[]> throwingDelegate = (message, items) =>
+            {
+                throw new Exception("Exception with array param");
+            };
+
+            _context.SetParameter("throwException", throwingDelegate);
+
+            // The array of objects triggers ConvertedObjects caching during parameter conversion.
+            // After the exception is thrown, if the bug exists, subsequent JavaScript would continue running.
+            Action action = () => _context.Run(@"
+                function waitSync(ms) { 
+                    const end = Date.now() + ms; 
+                    while (Date.now() < end) {} 
+                }
+                throwException('We are testing', [{ message: 'Starting', status: 'Loading'}]);
+                // If exception doesn't propagate, this code runs (which is the bug)
+                waitSync(1000);
+            ");
+            action.Should().ThrowExactly<JavascriptException>().WithMessage("Exception with array param");
         }
     }
 }
