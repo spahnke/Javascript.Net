@@ -59,7 +59,7 @@ namespace Noesis.Javascript.Tests
 
         class ClassWithMethods
         {
-            public void Method(ClassWithMethods a) { }
+            public void Method(ClassWithMethods a) {}
             public void MethodThatThrows() { throw new Exception("Test C# exception"); }
             public void MethodThatThrowsWithZeroByte() { throw new Exception("Test C#\0exception"); }
         }
@@ -108,8 +108,7 @@ namespace Noesis.Javascript.Tests
         [TestMethod]
         public void TerminateExecutionHasNoRaceCondition()
         {
-            var task = new Task(() =>
-            {
+            var task = new Task(() => {
                 _context.Run("while (true) {}");
             });
             task.Start();

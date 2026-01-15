@@ -36,8 +36,6 @@
 #include "JavascriptFunction.h"
 
 #include <string>
-#include <fstream>
-#include <chrono>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -48,26 +46,6 @@ namespace Noesis { namespace Javascript {
 using namespace std;
 using namespace System::Collections;
 using namespace System::Collections::Generic;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-static void LogToFile(const char* message)
-{
-    std::string logPath = "C:\\temp\\HandleTargetInvocationException.log";
-    std::ofstream logFile(logPath, std::ios::app);
-    auto now = std::chrono::system_clock::now();
-    auto time = std::chrono::system_clock::to_time_t(now);
-    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
-    
-    char timeBuffer[100];
-    struct tm timeInfo;
-    localtime_s(&timeInfo, &time);
-    strftime(timeBuffer, sizeof(timeBuffer), "%Y-%m-%d %H:%M:%S", &timeInfo);
-    
-    logFile << "[" << timeBuffer << "." << ms.count() << "] " << message << std::endl;
-    logFile.flush();
-    logFile.close();
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1107,71 +1085,37 @@ JavascriptInterop::Invoker(const v8::FunctionCallbackInfo<Value>& iArgs)
 		}
 		catch(System::Reflection::TargetInvocationException^ exception)
 		{
-			LogToFile("Caught TargetInvocationException in Invoker");
-			Local<Value> exceptionResult = HandleTargetInvocationException(exception);
-			LogToFile(exceptionResult.IsEmpty() ? "HandleTargetInvocationException returned empty Local<Value>" : "HandleTargetInvocationException returned a value");
-			//iArgs.GetReturnValue().Set(exceptionResult);
+			iArgs.GetReturnValue().Set(HandleTargetInvocationException(exception));
 			return;
 		}
 		catch(System::Exception^ exception)
 		{
-			LogToFile("Caught non-TargetInvocationException");
 			iArgs.GetReturnValue().Set(isolate->ThrowException(JavascriptInterop::ConvertToV8(exception)));
 			return;
 		}
 	}
 	else {
-		LogToFile("No method match - throwing argument mismatch");
 		iArgs.GetReturnValue().Set(isolate->ThrowException(JavascriptInterop::ConvertToV8("Argument mismatch for method \"" + memberName + "\".")));
 		return;
 	}
 
 	// return value
-	LogToFile("Invoker returning normal value");
 	iArgs.GetReturnValue().Set(ConvertToV8(ret));
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Local<Value>
 JavascriptInterop::HandleTargetInvocationException(System::Reflection::TargetInvocationException^ exception)
 {
-    LogToFile("HandleTargetInvocationException called");
-    if (exception && exception->InnerException)
-    {
-        pin_ptr<const wchar_t> msgPtr = PtrToStringChars(exception->InnerException->Message);
-        // Convert to a simple message without complex marshaling
-    }
-    
-    bool isTerminating = JavascriptContext::GetCurrent()->IsExecutionTerminating();
-    if (isTerminating)
-    {
-        LogToFile("IsExecutionTerminating() = true");
-    }
-    else
-    {
-        LogToFile("IsExecutionTerminating() = false");
-    }
-    
-    if (isTerminating)
-    {
+    if (JavascriptContext::GetCurrent()->IsExecutionTerminating())
         // As per comment in V8::TerminateExecution() we should just
         // return here, to allow v8 to keep unwinding its stack.
         // That is, TerminateExecution terminates the whole stack,
         // not just until we notice it in C++ land.
-        LogToFile("Returning empty Local<Value> to allow V8 to unwind");
         return Local<Value>();
-    }
     else
-    {
-        LogToFile("Throwing exception into V8 isolate");
-		Local<Value> exceptionValue = JavascriptInterop::ConvertToV8(exception->InnerException);
-		LogToFile("About to call isolate->ThrowException()");
-		Local<Value> result = JavascriptContext::GetCurrentIsolate()->ThrowException(exceptionValue);
-		LogToFile("isolate->ThrowException() returned");
-		return result;
-    }
+        return JavascriptContext::GetCurrentIsolate()->ThrowException(JavascriptInterop::ConvertToV8(exception->InnerException));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
