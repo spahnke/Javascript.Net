@@ -31,6 +31,8 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <v8.h>
+#include <gcroot.h>
+#include <vector>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -48,11 +50,12 @@ ref class JavascriptFunction;
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Remembers which objects have been just converted, to avoid stack overflows when we are 
 // converting self-referential objects.
+// Uses V8 Map for lookups (exact object identity) but tracks gcroot pointers in a C++ vector
+// for cleanup. This avoids V8 operations in the destructor that can interfere with pending
+// exceptions (ToLocalChecked() clears pending exceptions in V8 12.x).
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 class ConvertedObjects
 {
-	//std::unordered_map<v8::Local<v8::Object>, int> mConvertedHandles = new std::unordered_map<v8::Local<v8::Object>, int>();
-	//gcroot<System::Collections::Generic::Dictionary<System::Int32, System::Object^> ^> intToConverted = gcnew System::Collections::Generic::Dictionary<System::Int32, System::Object^>();
 public:
 	ConvertedObjects();
 	~ConvertedObjects();
@@ -61,6 +64,7 @@ public:
 
 private:
 	v8::Local<v8::Map> objectToConversion;
+	std::vector<void*> pointersToDelete;  // Store as void* to avoid C++/CLI constraints issue
 };
 
 

@@ -69,13 +69,10 @@ ConvertedObjects::ConvertedObjects()
 
 ConvertedObjects::~ConvertedObjects()
 {
-	size_t n = objectToConversion->Size();
-	Local<Array> keys_and_items = objectToConversion->AsArray();
-    auto context = JavascriptContext::GetCurrentIsolate()->GetCurrentContext();
-	for (size_t i = 0; i < n; i++) {
-		Local<Value> item_i = keys_and_items->Get(context, (uint32_t)i * 2 + 1).ToLocalChecked();
-		Local<External> external = Local<External>::Cast(item_i);
-		delete (gcroot<System::Object^> *)external->Value();
+	// Delete gcroot pointers using C++ vector - no V8 operations needed.
+	// This avoids calling ToLocalChecked() which clears pending exceptions in V8 12.x.
+	for (void* ptr : pointersToDelete) {
+		delete static_cast<gcroot<System::Object^>*>(ptr);
 	}
 }
 
@@ -84,8 +81,14 @@ ConvertedObjects::AddConverted(v8::Local<v8::Object> o, System::Object^ converte
 {
 	Isolate *isolate = JavascriptContext::GetCurrentIsolate();
 	Local<Context> context = isolate->GetCurrentContext();
-	Local<External> clr_object_wrapped_for_v8 = External::New(isolate, new gcroot<System::Object^>(converted));
-	objectToConversion->Set(context, o, clr_object_wrapped_for_v8);
+	
+	// Create gcroot pointer and track it for cleanup
+	gcroot<System::Object^>* ptr = new gcroot<System::Object^>(converted);
+	pointersToDelete.push_back(ptr);
+	
+	// Store in V8 Map for lookup by object identity
+	Local<External> external = External::New(isolate, ptr);
+	objectToConversion->Set(context, o, external);
 }
 
 System::Object^
@@ -94,13 +97,12 @@ ConvertedObjects::GetConverted(v8::Local<v8::Object> o)
 	Isolate *isolate = JavascriptContext::GetCurrentIsolate();
 	Local<Context> context = isolate->GetCurrentContext();
 	MaybeLocal<Value> maybe_found = objectToConversion->Get(context, o);
-	Local<Value> found = maybe_found.ToLocalChecked();
-	if (found->IsUndefined())
+	Local<Value> found;
+	if (!maybe_found.ToLocal(&found) || found->IsUndefined())
 		return nullptr;  // haven't seen this JavaScript object before
 	Local<External> external = Local<External>::Cast(found);
 	gcroot<System::Object^> *object_ptr = (gcroot<System::Object^> *)external->Value();
-	System::Object^ converted = *object_ptr;
-	return converted;
+	return *object_ptr;
 }
 
 
@@ -1096,11 +1098,10 @@ JavascriptInterop::Invoker(const v8::FunctionCallbackInfo<Value>& iArgs)
 		iArgs.GetReturnValue().Set(isolate->ThrowException(JavascriptInterop::ConvertToV8("Argument mismatch for method \"" + memberName + "\".")));
 		return;
 	}
-	
+
 	// return value
 	iArgs.GetReturnValue().Set(ConvertToV8(ret));
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1114,7 +1115,7 @@ JavascriptInterop::HandleTargetInvocationException(System::Reflection::TargetInv
         // not just until we notice it in C++ land.
         return Local<Value>();
     else
-	    return JavascriptContext::GetCurrentIsolate()->ThrowException(JavascriptInterop::ConvertToV8(exception->InnerException));
+        return JavascriptContext::GetCurrentIsolate()->ThrowException(JavascriptInterop::ConvertToV8(exception->InnerException));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
