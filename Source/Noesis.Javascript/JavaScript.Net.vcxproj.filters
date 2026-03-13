@@ -60,6 +60,9 @@
     <ClInclude Include="Inspector\InspectorClient.h">
       <Filter>Header Files\Debugging</Filter>
     </ClInclude>
+    <ClInclude Include="JavascriptDebugger.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AssemblyInfo.cpp">
@@ -100,6 +103,9 @@
     </ClCompile>
     <ClCompile Include="Inspector\InspectorClient.cpp">
       <Filter>Source Files\Debugging</Filter>
+    </ClCompile>
+    <ClCompile Include="JavascriptDebugger.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

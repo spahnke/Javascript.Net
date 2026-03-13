@@ -172,6 +172,7 @@
     <ClInclude Include="Inspector\BackChannelDelegate.h" />
     <ClInclude Include="Inspector\StringViewConversion.h" />
     <ClInclude Include="JavascriptContext.h" />
+    <ClInclude Include="JavascriptDebugger.h" />
     <ClInclude Include="JavascriptException.h" />
     <ClInclude Include="JavascriptExternal.h" />
     <ClInclude Include="JavascriptFunction.h" />
@@ -188,6 +189,7 @@
     <ClCompile Include="Inspector\BackChannelDelegate.cpp" />
     <ClCompile Include="Inspector\StringViewConversion.cpp" />
     <ClCompile Include="JavascriptContext.cpp" />
+    <ClCompile Include="JavascriptDebugger.cpp" />
     <ClCompile Include="JavascriptException.cpp" />
     <ClCompile Include="JavascriptExternal.cpp" />
     <ClCompile Include="JavascriptFunction.cpp" />

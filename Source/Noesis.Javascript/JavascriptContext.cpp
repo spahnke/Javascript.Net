@@ -38,6 +38,7 @@
 #include "JavascriptContext.h"
 
 #include "SystemInterop.h"
+#include "JavascriptDebugger.h"
 #include "JavascriptException.h"
 #include "JavascriptExternal.h"
 #include "JavascriptFunction.h"
@@ -181,15 +182,27 @@ JavascriptContext::JavascriptContext()
 	HandleScope scope(isolate);
 	mContext = new Persistent<Context>(isolate, Context::New(isolate));
     terminateRuns = false;
+    mDebugger = nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 JavascriptContext::~JavascriptContext()
 {
+    // Guard against double-Dispose: isolate is nulled at the end so a second call is a no-op.
+    if (isolate == nullptr) return;
+
 	{
 		v8::Locker v8ThreadLock(isolate);
 		v8::Isolate::Scope isolate_scope(isolate);
+
+		// Notify attached debugger before V8 cleanup so it can disconnect cleanly.
+		if (mDebugger != nullptr)
+		{
+			mDebugger->OnContextDisposing();
+			mDebugger = nullptr;
+		}
+
 		for each (WrappedJavascriptExternal wrapped in mExternals->Values)
 			delete wrapped.Pointer;
         for each (WrappedMethod wrapped in mMethods->Values)
@@ -207,7 +220,10 @@ JavascriptContext::~JavascriptContext()
         delete mTypeToConstructorMapping;
 	}
 	if (isolate != NULL)
+	{
 		isolate->Dispose();
+		isolate = nullptr;  // Null so double-Dispose is safe (guard check above).
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -341,8 +357,14 @@ JavascriptContext::Run(System::String^ iScript)
 	JavascriptScope scope(this);
 	//SetStackLimit();
 	HandleScope handleScope(isolate);
+
+	// Flush any queued debugger commands (e.g., Debugger.enable, setBreakpoint)
+	// before executing so they take effect for this run.
+	if (mDebugger != nullptr)
+		mDebugger->ProcessPendingCommands();
+
 	MaybeLocal<Value> ret;
-	
+
 	Local<Script> compiledScript = CompileScript(isolate, script);
 
 	{
@@ -352,7 +374,7 @@ JavascriptContext::Run(System::String^ iScript)
 		if (ret.IsEmpty())
 			throw gcnew JavascriptException(tryCatch);
 	}
-	
+
 	return JavascriptInterop::ConvertFromV8(ret.ToLocalChecked());
 }
 
@@ -374,7 +396,12 @@ JavascriptContext::Run(System::String^ iScript, System::String^ iScriptResourceN
 	JavascriptScope scope(this);
 	//SetStackLimit();
 	HandleScope handleScope(isolate);
-	MaybeLocal<Value> ret;	
+
+	// Flush any queued debugger commands before executing.
+	if (mDebugger != nullptr)
+		mDebugger->ProcessPendingCommands();
+
+	MaybeLocal<Value> ret;
 
 	Local<Script> compiledScript = CompileScript(isolate, script, scriptResourceName);
 	
