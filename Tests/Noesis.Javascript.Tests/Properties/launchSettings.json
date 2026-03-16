@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "Noesis.Javascript.Tests": {
-      "commandName": "Project",
-      "nativeDebugging": true
-    }
-  }
-}
