@@ -1,8 +1,9 @@
-﻿using System;
+﻿using FluentAssertions;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Threading;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using FluentAssertions;
 using System.Threading.Tasks;
 
 namespace Noesis.Javascript.Tests
@@ -115,6 +116,115 @@ namespace Noesis.Javascript.Tests
             _context.TerminateExecution(true);
             Action action = () => task.Wait(10 * 1000);
             action.Should().Throw<JavascriptException>("Because it was cancelled").WithMessage("Execution Terminated");
+        }
+
+        [TestMethod]
+        public void ExceptionThatUsesConvertedObjectWontCrash()
+        {
+            // This test reproduces a bug where passing array/object parameters (which use 
+            // ConvertedObjects for caching during conversion) would cause exceptions to not
+            // propagate properly. The ConvertedObjects destructor was doing V8 operations
+            // (ToLocalChecked) after ThrowException() was called, which cleared  the pending exception.
+
+            Action<string, object[]> throwingDelegate = (message, items) =>
+            {
+                throw new Exception("Exception with array param");
+            };
+
+            _context.SetParameter("throwException", throwingDelegate);
+
+            // The array of objects triggers ConvertedObjects caching during parameter conversion.
+            // After the exception is thrown, if the bug exists, subsequent JavaScript would continue running.
+            Action action = () => _context.Run(@"
+                function waitSync(ms) { 
+                    const end = Date.now() + ms; 
+                    while (Date.now() < end) {} 
+                }
+                throwException('We are testing', [{ message: 'Starting', status: 'Loading'}]);
+                // If exception doesn't propagate, this code runs (which is the bug)
+                waitSync(1000);
+            ");
+            action.Should().ThrowExactly<JavascriptException>().WithMessage("Exception with array param");
+        }
+
+        [TestMethod]
+        public void ExceptionInConstructorThatUsesConvertedObjectButPassesNullWontCrash()
+        {
+            _context.SetConstructor<ThrowingCtorWithConvertedObject>("ThrowingCtorWithConvertedObject", new Func<object, object>((options) => new ThrowingCtorWithConvertedObject(options as Dictionary<string, object>)));
+            Action action = () => _context.Run(@"
+                function waitSync(ms) { 
+                    const end = Date.now() + ms; 
+                    while (Date.now() < end) {} 
+                }
+                new ThrowingCtorWithConvertedObject();
+                // If exception doesn't propagate, this code runs (which is the bug)
+                waitSync(1000);
+            ");
+            action.Should().ThrowExactly<JavascriptException>().WithMessage("Exception with object literal param");
+        }
+
+        [TestMethod]
+        public void ExceptionInConstructorThatUsesConvertedObjectWontCrash()
+        {
+            _context.SetConstructor<ThrowingCtorWithConvertedObject>("ThrowingCtorWithConvertedObject", new Func<object, object>((options) => new ThrowingCtorWithConvertedObject(options as Dictionary<string, object>)));
+            Action action = () => _context.Run(@"
+                function waitSync(ms) { 
+                    const end = Date.now() + ms; 
+                    while (Date.now() < end) {} 
+                }
+                new ThrowingCtorWithConvertedObject({});
+                // If exception doesn't propagate, this code runs (which is the bug)
+                waitSync(1000);
+            ");
+            action.Should().ThrowExactly<JavascriptException>().WithMessage("Exception with object literal param");
+        }
+
+        [TestMethod]
+        public void ExceptionInMethodThatUsesConvertedObjectButPassesNullWontCrash()
+        {
+            _context.SetParameter("testing", new ThrowingMethodWithConvertedObject());
+            Action action = () => _context.Run(@"
+                function waitSync(ms) { 
+                    const end = Date.now() + ms; 
+                    while (Date.now() < end) {} 
+                }
+                testing.ThrowIt();
+                // If exception doesn't propagate, this code runs (which is the bug)
+                waitSync(1000);
+            ");
+            action.Should().ThrowExactly<JavascriptException>().WithMessage("Exception with object literal param");
+        }
+
+        [TestMethod]
+        public void ExceptionInMethodThatUsesConvertedObjectWontCrash()
+        {
+            _context.SetParameter("testing", new ThrowingMethodWithConvertedObject());
+            Action action = () => _context.Run(@"
+                function waitSync(ms) { 
+                    const end = Date.now() + ms; 
+                    while (Date.now() < end) {} 
+                }
+                testing.ThrowIt({});
+                // If exception doesn't propagate, this code runs (which is the bug)
+                waitSync(1000);
+            ");
+            action.Should().ThrowExactly<JavascriptException>().WithMessage("Exception with object literal param");
+        }
+
+        private class ThrowingCtorWithConvertedObject
+        {
+            public ThrowingCtorWithConvertedObject(Dictionary<string, object> options = null)
+            {
+                throw new Exception("Exception with object literal param");
+            }
+        }
+
+        private class ThrowingMethodWithConvertedObject
+        {
+            public void ThrowIt(Dictionary<string, object> options = null)
+            {
+                throw new Exception("Exception with object literal param");
+            }
         }
     }
 }
