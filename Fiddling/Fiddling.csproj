@@ -1,33 +1,32 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net472</TargetFramework>
-    <OutputType>Exe</OutputType>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <V8Platform>x64</V8Platform>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-  </PropertyGroup>
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net8.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+        <Platforms>AnyCPU;x64;x86</Platforms>
+    </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
-    <OutputPath>bin\x86\Debug\</OutputPath>
-    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
-    <V8Platform>Win32</V8Platform>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
-    <OutputPath>bin\x86\Release\</OutputPath>
-    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
-    <V8Platform>Win32</V8Platform>
-  </PropertyGroup>
+    <PropertyGroup Condition="'$(Platform)'=='x64'">
+        <PlatformTarget>x64</PlatformTarget>
+        <V8Platform>x64</V8Platform>
+    </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Source\Noesis.Javascript\JavaScript.Net.vcxproj" />
-  </ItemGroup>
+    <PropertyGroup Condition="'$(Platform)'=='x86'">
+        <PlatformTarget>x86</PlatformTarget>
+        <V8Platform>Win32</V8Platform>
+    </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
-    <PackageReference Include="System.Data.DataSetExtensions" Version="4.5.0" />
-  </ItemGroup>
+    <PropertyGroup Condition="'$(Platform)'=='AnyCPU'">
+        <PlatformTarget>x64</PlatformTarget>
+        <V8Platform>x64</V8Platform>
+    </PropertyGroup>
 
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="copy $(ProjectDir)..\$(V8Platform)\$(Configuration)\v8.dll $(ProjectDir)$(OutDir)&#xD;&#xA;copy $(ProjectDir)..\$(V8Platform)\$(Configuration)\v8_libbase.dll $(ProjectDir)$(OutDir)&#xD;&#xA;copy $(ProjectDir)..\$(V8Platform)\$(Configuration)\v8_libplatform.dll $(ProjectDir)$(OutDir)&#xD;&#xA;copy $(ProjectDir)..\$(V8Platform)\$(Configuration)\third_party_*.dll $(ProjectDir)$(OutDir)&#xD;&#xA;copy $(ProjectDir)..\$(V8Platform)\$(Configuration)\icu*.* $(ProjectDir)$(OutDir)" />
-  </Target>
+    <ItemGroup>
+        <ProjectReference Include="..\Source\Noesis.Javascript\JavaScript.Net.vcxproj" />
+    </ItemGroup>
+
+    <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+        <Exec Command="copy $(ProjectDir)..\$(V8Platform)\$(Configuration)\v8.dll $(ProjectDir)$(OutDir)&#xD;&#xA;copy $(ProjectDir)..\$(V8Platform)\$(Configuration)\v8_libbase.dll $(ProjectDir)$(OutDir)&#xD;&#xA;copy $(ProjectDir)..\$(V8Platform)\$(Configuration)\v8_libplatform.dll $(ProjectDir)$(OutDir)&#xD;&#xA;copy $(ProjectDir)..\$(V8Platform)\$(Configuration)\third_party_*.dll $(ProjectDir)$(OutDir)&#xD;&#xA;copy $(ProjectDir)..\$(V8Platform)\$(Configuration)\icu*.* $(ProjectDir)$(OutDir)" />
+    </Target>
 </Project>
