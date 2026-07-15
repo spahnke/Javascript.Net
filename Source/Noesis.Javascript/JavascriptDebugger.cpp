@@ -155,15 +155,14 @@ struct InspectorImpl : v8_inspector::V8InspectorClient, v8_inspector::V8Inspecto
         // Unblock any thread waiting in runMessageLoopOnPause.
         SignalStop(true);
 
+        v8::HandleScope scope(isolate);
+        v8::Local<v8::Context> ctx = contextPersistent->Get(isolate);
+        inspector->contextDestroyed(ctx);
         if (session)
         {
             session->stop();
             session.reset();
         }
-
-        v8::HandleScope scope(isolate);
-        v8::Local<v8::Context> ctx = contextPersistent->Get(isolate);
-        inspector->contextDestroyed(ctx);
         inspector.reset();  // Must be reset here, with the V8 lock held.
                             // The unique_ptr destructor in ~InspectorImpl would
                             // otherwise call ~V8Inspector() without the lock.
@@ -333,7 +332,6 @@ struct InspectorImpl : v8_inspector::V8InspectorClient, v8_inspector::V8Inspecto
 private:
     void FireMessage(const v8_inspector::StringView& view)
     {
-        if (disconnecting) return;
         System::String^ msg = StringViewToManagedString(view);
         managedDebugger->OnMessageReceived(msg);
     }

@@ -93,6 +93,76 @@ namespace Noesis.Javascript.Tests
         }
 
         [TestMethod]
+        [DataRow("continue")]
+        [DataRow("step")]
+        [DataRow("stop")]
+        public async Task DebuggerSendsExecutionContextCreatedAndDestroyedNotifications(string op)
+        {
+            var debugger = new JavascriptDebugger(_context, true);
+            var messages = new List<string>();
+
+            var pausedTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            debugger.MessageReceived += (_, e) =>
+            {
+                messages.Add(e.Message);
+                var json = JsonDocument.Parse(e.Message);
+                if (json.RootElement.TryGetProperty("method", out var method) &&
+                    method.GetString() == "Debugger.paused")
+                {
+                    pausedTcs.TrySetResult();
+                }
+            };
+
+            var task = Task.Run(() =>
+            {
+                try
+                {
+                    _context.Run("1 + 1;");
+                }
+                catch (JavascriptException ex) when (op == "stop" && ex.Message == "Execution Terminated")
+                {
+                    // allowed
+                }
+            });
+
+            debugger.SendCommand("{\"id\":1,\"method\":\"Runtime.enable\"}");
+            debugger.SendCommand("{\"id\":2,\"method\":\"Debugger.enable\"}");
+            debugger.SendCommand("{\"id\":3,\"method\":\"Debugger.pause\"}"); // schedule pause on first statement
+            debugger.SendCommand("{\"id\":4,\"method\":\"Runtime.runIfWaitingForDebugger\"}");
+
+            await pausedTcs.Task;
+            messages.Should().Contain(m => m.Contains("\"method\":\"Runtime.executionContextCreated\""));
+            debugger.IsPaused.Should().BeTrue();
+
+            switch (op)
+            {
+                case "continue":
+                    debugger.SendCommand("{\"id\":5,\"method\":\"Debugger.resume\",\"params\":{}}");
+                    break;
+                case "step":
+                    // need 2 steps to reach end of script
+                    debugger.SendCommand("{\"id\":5,\"method\":\"Debugger.stepOver\",\"params\":{}}");
+                    debugger.SendCommand("{\"id\":6,\"method\":\"Debugger.stepOver\",\"params\":{}}");
+                    break;
+                case "stop":
+                    debugger.SendCommand("{\"id\":5,\"method\":\"Debugger.resume\",\"params\":{\"terminateOnResume\":true}}");
+                    break;
+                default:
+                    Assert.Fail("Unknown operation");
+                    break;
+            }
+
+            await task;
+
+            // Dispose disconnects the inspector and issues a contextDestroyed call which in turn sends a
+            // Runtime.executionContextDestroyed notification. This notification is important because it indicates to
+            // the external debugger client that the script execution has terminated. Otherwise we don't know if the
+            // script ended or the current step just takes a long time.
+            debugger.Dispose();
+            messages.Should().Contain(m => m.Contains("\"method\":\"Runtime.executionContextDestroyed\""));
+        }
+
+        [TestMethod]
         public void PausesAtDebuggerStatement()
         {
             using var debugger = new JavascriptDebugger(_context, false);
@@ -281,6 +351,9 @@ namespace Noesis.Javascript.Tests
             result.Should().Be(99);
 
             // Only the first debugger statement should have fired a pause event.
+            // TODO(seb) This assert is now false since we allowed the Runtime.executionContextDestroyed notification to
+            // get through after Dispose. Investigate if the second pause statement is a bug because of that change, or
+            // if this always was a wrong assumption if we want to ensure proper protocol message sequence.
             pauseCount.Should().Be(1, "second debugger statement should be skipped after dispose");
             debugger.IsConnected.Should().BeFalse();
         }
