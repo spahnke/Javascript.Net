@@ -32,6 +32,7 @@ var chromiumInspectList = """
     """u8.ToArray();
 
 var code = """
+    debugger;
     for (let it = 0; it < 3; it++) {
         const result = calc(1000);
         console.log(result);
